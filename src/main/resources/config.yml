@@ -1,0 +1,14 @@
+# PrivateChest Configuration File
+
+# Whether double chests can be protected. If false, only single chests are allowed.
+allow-double-chests: true
+
+# Time (in seconds) a chest remains unlocked after a successful password entry.
+# If 0, the chest remains locked and must be unlocked each time.
+unlock-duration-seconds: 0
+
+# Whether other players can unlock a chest if they know the password, even if they are not the owner.
+allow-shared-access: false
+
+#Notifies the owner that the opened chest is protected
+notify-owner-on-open: true

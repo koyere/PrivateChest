@@ -1,0 +1,21 @@
+name: PrivateChest
+version: 1.0
+main: me.tuplugin.privatechest.PrivateChest
+api-version: 1.16
+author: Koyere
+description: A plugin that allows players to lock chests with a personal password.
+
+commands:
+  lockchest:
+    description: Lock a chest with a password.
+    usage: /lockchest <password>
+
+  unlockchest:
+    description: Unlock a locked chest.
+    usage: /unlockchest <password>
+
+permissions:
+  privatechest.use:
+    description: Allows using /lockchest and /unlockchest.
+    default: true
+

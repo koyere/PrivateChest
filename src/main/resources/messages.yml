@@ -1,0 +1,20 @@
+# PrivateChest - Messages File
+
+prefix: "&7[&6PrivateChest&7] "
+
+locked: "&aThis chest has been successfully locked."
+already_locked: "&eThis chest is already locked."
+unlocked: "&aChest unlocked successfully!"
+wrong_password: "&cIncorrect password. Access denied."
+not_your_chest: "&cYou are not the owner of this chest."
+not_a_chest: "&cYou must be looking at a chest to use this command."
+not_locked: "&eThis chest is not locked."
+
+usage_lock: "&cUsage: /lockchest <password>"
+usage_unlock: "&cUsage: /unlockchest <password>"
+
+no_permission: "&cYou do not have permission to use this command."
+console_only_player: "&cThis command can only be used by players."
+owner_access_notice: "&7This chest is locked, but you are the owner."
+chest_break_blocked: "&cThis chest is protected and cannot be broken."
+chest_break_warning: "&eYou broke your locked chest."
