@@ -57,6 +57,6 @@ public class ChestListener implements Listener {
 
     private boolean isLockableContainer(Block block) {
         Material type = block.getType();
-        return type == Material.CHEST || type == Material.TRAPPED_CHEST;
+        return type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL;
     }
 }
