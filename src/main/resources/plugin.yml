@@ -1,5 +1,5 @@
 name: PrivateChest
-version: 1.1
+version: 1.3
 main: me.tuplugin.privatechest.PrivateChest
 api-version: 1.16
 author: Koyere
@@ -14,8 +14,19 @@ commands:
     description: Unlock a locked chest.
     usage: /unlockchest <password>
 
+  privatechest:
+    description: Reload PrivateChest config and messages.
+    usage: /privatechest reload
+
+  clearchests:
+    description: Clear orphaned chest data.
+    usage: /clearchests
+
 permissions:
   privatechest.use:
     description: Allows using /lockchest and /unlockchest.
     default: true
 
+  privatechest.admin:
+    description: Allows reloading configuration.
+    default: op

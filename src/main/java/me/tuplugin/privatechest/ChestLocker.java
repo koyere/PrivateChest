@@ -1,6 +1,8 @@
 package me.tuplugin.privatechest;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 
@@ -70,7 +72,7 @@ public class ChestLocker {
     }
 
     /**
-     * Removes protection from a chest (used after successful unlock).
+     * Removes protection from a chest (used after successful unlock or removal).
      */
     public void removeProtection(Block block) {
         Location loc = block.getLocation();
@@ -87,5 +89,36 @@ public class ChestLocker {
 
     public Map<Location, String> getChestPasswords() {
         return chestPasswords;
+    }
+
+    /**
+     * Serializes a Location to a String (world:x:y:z)
+     */
+    public static String serializeLocation(Location loc) {
+        return loc.getWorld().getName() + ":" + loc.getBlockX() + ":" + loc.getBlockY() + ":" + loc.getBlockZ();
+    }
+
+    /**
+     * Deserializes a String to a Location (world:x:y:z)
+     */
+    public static Location deserializeLocation(String serialized) {
+        String[] parts = serialized.split(":");
+        if (parts.length != 4) {
+            return null;
+        }
+
+        World world = Bukkit.getWorld(parts[0]);
+        if (world == null) {
+            return null;
+        }
+
+        try {
+            int x = Integer.parseInt(parts[1]);
+            int y = Integer.parseInt(parts[2]);
+            int z = Integer.parseInt(parts[3]);
+            return new Location(world, x, y, z);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

@@ -11,6 +11,7 @@ public class MessageManager {
     private final PrivateChest plugin;
     private FileConfiguration messages;
     private String prefix;
+    private boolean usePrefix;
 
     public MessageManager(PrivateChest plugin) {
         this.plugin = plugin;
@@ -25,7 +26,23 @@ public class MessageManager {
         }
 
         messages = YamlConfiguration.loadConfiguration(file);
-        prefix = translate(messages.getString("prefix", "&7[&6PrivateChest&7] "));
+        reloadPrefix();
+    }
+
+    /**
+     * Reload prefix settings from config.yml
+     */
+    private void reloadPrefix() {
+        plugin.reloadConfig(); // Ensure config is loaded
+        this.usePrefix = plugin.getConfig().getBoolean("use-prefix", true);
+        this.prefix = translate(plugin.getConfig().getString("prefix", "&7[&6PrivateChest&7] "));
+    }
+
+    /**
+     * Reload messages.yml and update prefix
+     */
+    public void reloadMessages() {
+        loadMessages();
     }
 
     /**
@@ -33,7 +50,11 @@ public class MessageManager {
      */
     public String get(String key) {
         String msg = messages.getString(key, key);
-        return prefix + translate(msg);
+        if (usePrefix) {
+            return prefix + translate(msg);
+        } else {
+            return translate(msg);
+        }
     }
 
     /**

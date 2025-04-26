@@ -1,7 +1,5 @@
 # PrivateChest - Messages File
 
-prefix: "&7[&6PrivateChest&7] "
-
 locked: "&aThis chest has been successfully locked."
 already_locked: "&eThis chest is already locked."
 unlocked: "&aChest unlocked successfully!"
@@ -18,3 +16,5 @@ console_only_player: "&cThis command can only be used by players."
 owner_access_notice: "&7This chest is locked, but you are the owner."
 chest_break_blocked: "&cThis chest is protected and cannot be broken."
 chest_break_warning: "&eYou broke your locked chest."
+reload_success: "&a✔ PrivateChest configuration and messages reloaded successfully."
+cleared_chests: "&a✔ Cleared {amount} orphaned chest entries."

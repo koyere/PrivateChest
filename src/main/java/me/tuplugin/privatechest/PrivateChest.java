@@ -1,6 +1,9 @@
 package me.tuplugin.privatechest;
 
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bstats.bukkit.Metrics;
+import me.tuplugin.privatechest.ReloadCommand;
+import me.tuplugin.privatechest.ClearChestsCommand;
 
 public class PrivateChest extends JavaPlugin {
 
@@ -25,6 +28,9 @@ public class PrivateChest extends JavaPlugin {
         saveDefaultConfig(); // config.yml
         //saveResource("messages.yml", false); // messages.yml (only if not present)
 
+        // bStats Metrics
+        new Metrics(this, 25606);
+
         // Load managers
         messageManager = new MessageManager(this);
 
@@ -34,8 +40,10 @@ public class PrivateChest extends JavaPlugin {
 
 
         // Register commands and events
+        getCommand("privatechest").setExecutor(new ReloadCommand(this));
         getCommand("lockchest").setExecutor(new LockCommand(this));
         getCommand("unlockchest").setExecutor(new UnlockCommand(this));
+        getCommand("clearchests").setExecutor(new ClearChestsCommand(this));
         getServer().getPluginManager().registerEvents(new ChestListener(this), this);
         getServer().getPluginManager().registerEvents(new BlockProtectionListener(this), this);
 
