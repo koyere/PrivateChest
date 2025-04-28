@@ -62,6 +62,33 @@ Supported forks: Paper, Pufferfish, Purpur
 View usage data at:
 🔗 bStats - PrivateChest
 
+---
+
+## 🧩 Public API (Since v1.4)
+
+PrivateChest now offers a simple and safe API for developers to integrate with protected chests and barrels.
+
+**Example usage:**
+
+```java
+import me.tuplugin.privatechest.api.PrivateChestAPI;
+
+// Check if a block is locked
+boolean isLocked = PrivateChestAPI.isLocked(block);
+
+// Check if a player owns a block
+boolean isOwner = PrivateChestAPI.isOwner(block, player);
+
+// Lock a chest manually
+PrivateChestAPI.lockBlock(block, player, "mypassword");
+
+// Unlock a chest manually
+PrivateChestAPI.unlockBlock(block);
+
+// Get the owner of a locked chest
+UUID owner = PrivateChestAPI.getOwner(block);
+
+
 📜 License
 PrivateChest is distributed under the MIT License.
 See LICENSE for more information.
