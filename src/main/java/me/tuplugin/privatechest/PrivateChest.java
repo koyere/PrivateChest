@@ -46,6 +46,7 @@ public class PrivateChest extends JavaPlugin {
         getCommand("clearchests").setExecutor(new ClearChestsCommand(this));
         getServer().getPluginManager().registerEvents(new ChestListener(this), this);
         getServer().getPluginManager().registerEvents(new BlockProtectionListener(this), this);
+        getServer().getPluginManager().registerEvents(new HopperProtectionListener(), this);
 
 
         getLogger().info("✅ PrivateChest has been enabled successfully.");

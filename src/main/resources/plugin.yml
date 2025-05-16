@@ -1,5 +1,5 @@
 name: PrivateChest
-version: 1.3
+version: 1.6.2
 main: me.tuplugin.privatechest.PrivateChest
 api-version: 1.16
 author: Koyere
@@ -7,26 +7,26 @@ description: A plugin that allows players to lock chests with a personal passwor
 
 commands:
   lockchest:
-    description: Lock a chest with a password.
+    description: Lock the chest you're looking at using a password.
     usage: /lockchest <password>
 
   unlockchest:
-    description: Unlock a locked chest.
+    description: Unlock your locked chest by entering the password.
     usage: /unlockchest <password>
 
   privatechest:
-    description: Reload PrivateChest config and messages.
+    description: Reload PrivateChest configuration and messages.
     usage: /privatechest reload
 
   clearchests:
-    description: Clear orphaned chest data.
+    description: Remove orphaned chest entries from data.yml.
     usage: /clearchests
 
 permissions:
   privatechest.use:
-    description: Allows using /lockchest and /unlockchest.
+    description: Allows players to use /lockchest and /unlockchest.
     default: true
 
   privatechest.admin:
-    description: Allows reloading configuration.
+    description: Allows use of admin commands like /privatechest reload and /clearchests.
     default: op
