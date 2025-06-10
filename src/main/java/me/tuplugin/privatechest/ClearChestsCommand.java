@@ -1,5 +1,7 @@
 package me.tuplugin.privatechest;
 
+import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -29,33 +31,50 @@ public class ClearChestsCommand implements CommandExecutor {
             return true;
         }
 
+        sender.sendMessage(messages.raw("cleaning_start")); // Optional: Inform about start
+
         int cleared = 0;
+        Map<Location, String> owners = chestLocker.getChestOwners();
+        Map<Location, String> passwords = chestLocker.getChestPasswords();
 
-        Iterator<Map.Entry<org.bukkit.Location, String>> it = chestLocker.getChestOwners().entrySet().iterator();
+        // Use an iterator to safely remove elements while looping
+        Iterator<Map.Entry<Location, String>> it = owners.entrySet().iterator();
         while (it.hasNext()) {
-            Map.Entry<org.bukkit.Location, String> entry = it.next();
-            Block block = entry.getKey().getBlock();
+            Map.Entry<Location, String> entry = it.next();
+            Location loc = entry.getKey();
 
-            if (block == null || !isLockableContainer(block)) {
-                it.remove();
+            // Check if the world is loaded. If not, it's orphaned.
+            if (loc.getWorld() == null) {
+                passwords.remove(loc); // Remove from passwords first
+                it.remove(); // Remove from owners
+                cleared++;
+                continue; // Move to the next entry
+            }
+
+            Block block = loc.getBlock();
+
+            // Check if the block is no longer a lockable container. If so, it's orphaned.
+            if (!isLockableContainer(block)) {
+                passwords.remove(loc); // Remove from passwords
+                it.remove(); // Remove from owners
                 cleared++;
             }
         }
 
-        dataManager.saveData();
-        sender.sendMessage(messages.raw("cleared_chests").replace("{amount}", String.valueOf(cleared)));
+        // Only save if something was cleared to avoid unnecessary disk writes
+        if (cleared > 0) {
+            dataManager.saveData();
+            sender.sendMessage(messages.raw("cleaned_chests").replace("{amount}", String.valueOf(cleared))); // Use 'cleaned_chests' or update 'cleared_chests'
+        } else {
+            sender.sendMessage(messages.raw("no_chests_to_clean")); // Optional: Message if nothing was found
+        }
+
         return true;
     }
 
     private boolean isLockableContainer(Block block) {
         if (block == null) return false;
-        switch (block.getType()) {
-            case CHEST:
-            case TRAPPED_CHEST:
-            case BARREL:
-                return true;
-            default:
-                return false;
-        }
+        Material type = block.getType();
+        return type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL;
     }
 }

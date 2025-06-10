@@ -1,22 +1,40 @@
-# PrivateChest Configuration File
+# -------------------------------------------------- #
+#            PrivateChest Configuration File         #
+# -------------------------------------------------- #
+#
+# Welcome to the PrivateChest configuration!
+# Here you can customize how the plugin behaves on your server.
+# Use standard Bukkit color codes (&) for messages.
+#
 
-# PrivateChest Configuration
+# --- Message Prefix Settings ---
 
-# Should the plugin add a prefix to all messages?
+# Should the plugin add a prefix before its messages?
+# Default: true
 use-prefix: true
 
-# The prefix to show before messages
+# The prefix to display before messages (only if 'use-prefix' is true).
+# Default: "&7[&6PrivateChest&7] "
 prefix: "&7[&6PrivateChest&7] "
 
-# Whether double chests can be protected. If false, only single chests are allowed.
-allow-double-chests: true
+# --- Notification Settings ---
 
-# Time (in seconds) a chest remains unlocked after a successful password entry.
-# If 0, the chest remains locked and must be unlocked each time.
-unlock-duration-seconds: 0
-
-# Whether other players can unlock a chest if they know the password, even if they are not the owner.
-allow-shared-access: false
-
-# Show a notification to the owner when they open their own chest
+# Should the owner receive a small notification message when they
+# successfully open one of their own locked containers?
+# Default: true
 notify-owner-on-open: true
+
+# Should an admin receive a small notification message when they
+# open a container using their bypass permission (privatechest.admin)?
+# Default: true
+notify-admin-on-open: true
+
+# --- Notes on Removed Options ---
+#
+# - allow-double-chests: Removed as double chest support is now core.
+# - unlock-duration-seconds: Removed as temporary unlock is not currently implemented.
+# - allow-shared-access: Removed as shared access (non-owner unlock with password)
+#   is not currently implemented.
+#
+# If these features are added in the future, their options can be restored.
+#

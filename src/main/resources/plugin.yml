@@ -1,32 +1,42 @@
+# Main plugin definition
 name: PrivateChest
-version: 1.6.2
+version: 1.6.3
 main: me.tuplugin.privatechest.PrivateChest
+# Minimum Spigot/Paper API version required (1.16 ensures modern methods)
 api-version: 1.16
 author: Koyere
 description: A plugin that allows players to lock chests with a personal password.
+# Optional: Link to your SpigotMC or GitHub page
+website: https://www.spigotmc.org/resources/privatechest.124359/
 
+# Command definitions
 commands:
   lockchest:
-    description: Lock the chest you're looking at using a password.
+    description: Lock the container you're looking at using a password.
     usage: /lockchest <password>
 
   unlockchest:
-    description: Unlock your locked chest by entering the password.
+    description: Unlock your locked container by entering the password.
     usage: /unlockchest <password>
 
   privatechest:
     description: Reload PrivateChest configuration and messages.
     usage: /privatechest reload
+    # Optional: Added a short alias for convenience
+    aliases: [pc]
 
   clearchests:
-    description: Remove orphaned chest entries from data.yml.
+    description: Remove orphaned container entries from data.yml.
     usage: /clearchests
 
+# Permission definitions
 permissions:
   privatechest.use:
     description: Allows players to use /lockchest and /unlockchest.
+    # Defaults to true, so all players can use it unless a permission plugin overrides it.
     default: true
 
   privatechest.admin:
-    description: Allows use of admin commands like /privatechest reload and /clearchests.
+    description: Allows use of admin commands and bypass protection.
+    # Defaults to op, so only server operators have admin rights by default.
     default: op

@@ -1,21 +1,67 @@
-# PrivateChest - Messages File
+# -------------------------------------------------- #
+#              PrivateChest Messages File            #
+# -------------------------------------------------- #
+#
+# Customize all messages sent by the PrivateChest plugin here.
+# Use standard Bukkit color codes (&) for colors and formatting.
+# Placeholders like {amount} will be replaced automatically.
+#
 
-locked: "&aThis chest has been successfully locked."
-already_locked: "&eThis chest is already locked."
-unlocked: "&aChest unlocked successfully!"
-wrong_password: "&cIncorrect password. Access denied."
-not_your_chest: "&cYou are not the owner of this chest."
-not_a_chest: "&cYou must be looking at a chest to use this command."
-not_locked: "&eThis chest is not locked."
+# --- General Errors & Permissions ---
 
-usage_lock: "&cUsage: /lockchest <password>"
-usage_unlock: "&cUsage: /unlockchest <password>"
-
+# Sent when a player lacks the necessary permission.
 no_permission: "&cYou do not have permission to use this command."
+# Sent when a console tries to run a player-only command.
 console_only_player: "&cThis command can only be used by players."
-owner_access_notice: "&7This chest is locked, but you are the owner."
-chest_break_blocked: "&cThis chest is protected and cannot be broken."
-chest_break_warning: "&eYou broke your locked chest."
+# Sent when the target block isn't a Chest, Trapped Chest, or Barrel.
+not_a_chest: "&cYou must be looking at a Chest or Barrel to use this command."
+# Sent when trying to interact with a chest that isn't locked.
+not_locked: "&eThis container is not locked."
+# Sent when a player tries to interact with a chest they don't own (and isn't admin).
+not_your_chest: "&cYou cannot interact with this container because you are not the owner."
+# Generic error for unexpected issues.
+error_generic: "&cAn unexpected error occurred. Please contact an administrator."
+
+# --- Lock Command (/lockchest) ---
+
+# Sent when /lockchest is used incorrectly.
+usage_lock: "&cUsage: /lockchest <password>"
+# Sent when /lockchest successfully locks a container.
+locked: "&aThis container has been successfully locked."
+# Sent when trying to lock an already locked container.
+already_locked: "&eThis container is already locked."
+
+# --- Unlock Command (/unlockchest) ---
+
+# Sent when /unlockchest is used incorrectly.
+usage_unlock: "&cUsage: /unlockchest <password>"
+# Sent when /unlockchest successfully unlocks a container.
+unlocked: "&aContainer unlocked successfully!"
+# Sent when the wrong password is provided for /unlockchest.
+wrong_password: "&cIncorrect password. Access denied."
+
+# --- ClearChests Command (/clearchests) ---
+
+# Sent when the /clearchests command starts.
+cleaning_start: "&eStarting cleanup of orphaned chest data..."
+# Sent when /clearchests finishes, showing how many entries were removed.
+# Renamed from 'cleared_chests' to 'cleaned_chests' for clarity.
+cleaned_chests: "&a✔ Cleaned {amount} orphaned container entries."
+# Sent when /clearchests runs but finds no entries to clean.
+no_chests_to_clean: "&aNo orphaned container entries found to clean."
+
+# --- Reload Command (/privatechest reload) ---
+
+# Sent when the configuration is successfully reloaded.
 reload_success: "&a✔ PrivateChest configuration and messages reloaded successfully."
-cleared_chests: "&a✔ Cleared {amount} orphaned chest entries."
-admin_access_notice: "&6(Admin) &fYou have accessed a protected chest."
+
+# --- Notifications & Warnings ---
+
+# Sent to the owner when they open their own locked container.
+owner_access_notice: "&7(Owner Access)"
+# Sent to an admin when they open a locked container using bypass.
+admin_access_notice: "&6(Admin Access)"
+# Sent to the owner when they break their locked container.
+chest_break_warning: "&eYou broke your locked container."
+# Sent to an admin when they break a locked container.
+admin_chest_break_notice: "&e(Admin) You broke a protected container."

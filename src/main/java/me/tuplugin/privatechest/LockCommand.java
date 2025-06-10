@@ -2,11 +2,18 @@ package me.tuplugin.privatechest;
 
 import org.bukkit.Material;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace; // Importado
+import org.bukkit.block.BlockState;
+import org.bukkit.block.data.BlockData; // Importado
+import org.bukkit.block.data.type.Chest; // Importado - ¡CRUCIAL QUE ESTO SE RESUELVA!
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.event.player.PlayerInteractEvent;
+// Se elimina la importación de org.bukkit.inventory.DoubleChest
+
+import java.util.HashSet;
+import java.util.Set;
 
 public class LockCommand implements CommandExecutor {
 
@@ -35,39 +42,115 @@ public class LockCommand implements CommandExecutor {
         }
 
         if (args.length != 1) {
-            player.sendMessage(messages.raw("usage_lock")); // Add this line in messages.yml
+            player.sendMessage(messages.raw("usage_lock"));
             return true;
         }
 
         String password = args[0];
-
-        // Use getTargetBlock with null to allow air passthrough, more accurate
         Block targetBlock = player.getTargetBlock(null, 5);
 
-        if (targetBlock == null || !isLockableContainer(targetBlock)) {
+        if (targetBlock == null || !isLockableContainer(targetBlock.getType())) {
             player.sendMessage(messages.get("not_a_chest"));
             return true;
         }
 
-        if (chestLocker.isChestLocked(targetBlock)) {
-            player.sendMessage(messages.get("already_locked"));
+        Set<Block> blocksToLock = new HashSet<>();
+        BlockState state = targetBlock.getState();
+
+        // --- INICIO: Lógica alternativa para Cofres Dobles usando BlockData ---
+        if (state instanceof org.bukkit.block.Chest) { // Check if it's a Bukkit Chest state
+            BlockData blockData = targetBlock.getBlockData();
+            // Check if it has Chest BlockData (requires Spigot 1.13+)
+            if (blockData instanceof Chest) {
+                Chest chestData = (Chest) blockData;
+                Chest.Type chestType = chestData.getType();
+
+                if (chestType == Chest.Type.SINGLE) {
+                    // It's a single chest or a barrel treated as single.
+                    blocksToLock.add(targetBlock);
+                } else {
+                    // It's LEFT or RIGHT, meaning it's part of a double chest.
+                    blocksToLock.add(targetBlock); // Add the targeted half.
+                    BlockFace facing = chestData.getFacing();
+                    BlockFace otherHalfDirection = getOtherChestHalfDirection(chestType, facing);
+
+                    if (otherHalfDirection != null) {
+                        Block otherBlock = targetBlock.getRelative(otherHalfDirection);
+                        // Verify the other block is also a chest before adding.
+                        if (otherBlock.getState() instanceof org.bukkit.block.Chest) {
+                            blocksToLock.add(otherBlock);
+                        }
+                    }
+                }
+            } else {
+                // Fallback for older versions or unexpected data: treat as single.
+                blocksToLock.add(targetBlock);
+            }
+        } else if (targetBlock.getType() == Material.BARREL) {
+            // It's a barrel, always single.
+            blocksToLock.add(targetBlock);
+        } else {
+            player.sendMessage(messages.get("not_a_chest"));
             return true;
         }
+        // --- FIN: Lógica alternativa ---
 
-        boolean success = chestLocker.lockChest(targetBlock, player, password);
+        // Check if any part is already locked
+        for (Block block : blocksToLock) {
+            if (chestLocker.isChestLocked(block)) {
+                player.sendMessage(messages.get("already_locked"));
+                return true;
+            }
+        }
 
-        if (success) {
-            plugin.getDataManager().saveData(); // Save immediately
+        // Lock all parts
+        boolean allLockedSuccessfully = true;
+        for (Block block : blocksToLock) {
+            if (!chestLocker.lockChest(block, player, password)) {
+                allLockedSuccessfully = false;
+                break;
+            }
+        }
+
+        // Send feedback
+        if (allLockedSuccessfully) {
+            plugin.getDataManager().saveData();
             player.sendMessage(messages.get("locked"));
         } else {
-            player.sendMessage(messages.get("already_locked"));
+            player.sendMessage(messages.get("error_generic"));
         }
 
         return true;
     }
 
-    private boolean isLockableContainer(Block block) {
-        Material type = block.getType();
+    /**
+     * Determines the direction of the other half of a double chest.
+     * @param type The type (LEFT or RIGHT).
+     * @param facing The direction the chest is facing.
+     * @return The BlockFace direction to the other half, or null if single/error.
+     */
+    private BlockFace getOtherChestHalfDirection(Chest.Type type, BlockFace facing) {
+        if (type == Chest.Type.LEFT) {
+            switch (facing) {
+                case NORTH: return BlockFace.EAST;
+                case EAST:  return BlockFace.SOUTH;
+                case SOUTH: return BlockFace.WEST;
+                case WEST:  return BlockFace.NORTH;
+                default:    return null; // Should not happen for chests
+            }
+        } else if (type == Chest.Type.RIGHT) {
+            switch (facing) {
+                case NORTH: return BlockFace.WEST;
+                case EAST:  return BlockFace.NORTH;
+                case SOUTH: return BlockFace.EAST;
+                case WEST:  return BlockFace.SOUTH;
+                default:    return null; // Should not happen for chests
+            }
+        }
+        return null; // Not a double chest part
+    }
+
+    private boolean isLockableContainer(Material type) {
         return type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL;
     }
 }

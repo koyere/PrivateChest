@@ -21,10 +21,14 @@ public class ReloadCommand implements CommandExecutor {
             return true;
         }
 
+        // Reload the main configuration file (config.yml)
         plugin.reloadConfig();
-        plugin.getMessageManager().reloadMessages();
 
-        sender.sendMessage(messages.raw("reload_success"));
+        // Reload messages (messages.yml) and update prefix settings
+        messages.reload();
+
+        // Send a success message to the sender (with prefix)
+        sender.sendMessage(messages.get("reload_success"));
         return true;
     }
 }
