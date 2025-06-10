@@ -19,12 +19,14 @@ public class ChestListener implements Listener {
 
     private final PrivateChest plugin;
     private final ChestLocker chestLocker;
+    private final TrustManager trustManager;
     private final MessageManager messages;
     private final FileConfiguration config;
 
     public ChestListener(PrivateChest plugin) {
         this.plugin = plugin;
         this.chestLocker = ChestLocker.getInstance();
+        this.trustManager = TrustManager.getInstance();
         this.messages = plugin.getMessageManager();
         this.config = plugin.getConfig();
     }
@@ -63,8 +65,7 @@ public class ChestListener implements Listener {
         }
 
         // If we reach here, at least one part is locked.
-        // Now we check ownership or admin bypass using the 'lockedBlock'
-        // We use 'lockedBlock' because that's the location stored in ChestLocker.
+        // Now we check ownership, trust, or admin bypass using the 'lockedBlock'
 
         // Allow if player is the owner
         if (chestLocker.isOwner(lockedBlock, player)) {
@@ -82,7 +83,16 @@ public class ChestListener implements Listener {
             return; // Allow access
         }
 
-        // If not owner and not admin, deny access
+        // Check if player is trusted by the owner
+        String ownerUUID = chestLocker.getOwnerUUID(lockedBlock);
+        if (ownerUUID != null && trustManager.isTrusted(ownerUUID, player.getUniqueId().toString())) {
+            if (config.getBoolean("notify-trusted-on-open", true)) {
+                player.sendMessage(messages.get("trusted_access_notice"));
+            }
+            return; // Allow access
+        }
+
+        // If not owner, not admin, and not trusted, deny access
         event.setCancelled(true);
         player.sendMessage(messages.get("not_your_chest"));
     }

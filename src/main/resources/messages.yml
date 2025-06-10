@@ -40,6 +40,82 @@ unlocked: "&aContainer unlocked successfully!"
 # Sent when the wrong password is provided for /unlockchest.
 wrong_password: "&cIncorrect password. Access denied."
 
+# --- Trust System Commands (/trust, /untrust) ---
+
+# Sent when /trust is used incorrectly.
+usage_trust: "&cUsage: /trust <player> or /trust list"
+# Sent when /untrust is used incorrectly.
+usage_untrust: "&cUsage: /untrust <player> or /untrust all"
+# Sent when a player is not found (online).
+player_not_found: "&cPlayer '{player}' is not online."
+# Sent when trying to trust yourself.
+cannot_trust_yourself: "&cYou cannot trust yourself."
+# Sent when successfully trusting a player.
+player_trusted: "&aYou have trusted &e{player}&a. They can now access your locked containers."
+# Sent to the player who was trusted.
+trusted_by_player: "&a&l{player} &ahas given you access to their locked containers."
+# Sent when trying to trust a player who is already trusted.
+player_already_trusted: "&e{player} is already trusted."
+# Sent when successfully untrusting a player.
+player_untrusted: "&cYou have removed trust from &e{player}&c. They can no longer access your locked containers."
+# Sent to the player who was untrusted.
+untrusted_by_player: "&c&l{player} &chas removed your access to their locked containers."
+# Sent when trying to untrust a player who isn't trusted.
+player_not_trusted: "&e{player} is not in your trusted list."
+# Sent when no players are trusted.
+no_trusted_players: "&eYou haven't trusted any players yet."
+# Sent when successfully untrusting all players.
+all_players_untrusted: "&cRemoved trust from {count} players."
+# Sent when untrust all fails.
+untrust_all_failed: "&cFailed to remove trust from players."
+
+# --- Trust List Display ---
+
+# Header for trusted players list.
+trusted_players_header: "&6=== &eTrusted Players &6==="
+# Entry format for each trusted player.
+trusted_player_entry: "&7- &e{player} &7({status})"
+# Footer for trusted players list.
+trusted_players_footer: "&6=== &eTotal: {count} players &6==="
+# Online status indicator.
+player_status_online: "&aOnline"
+# Offline status indicator.
+player_status_offline: "&7Offline"
+
+# --- Chest Limit Messages ---
+
+# Sent when a player tries to lock more chests than their limit allows.
+limit_exceeded: "&cYou cannot lock more chests! Current: {current}/{limit}. You're trying to lock {trying} more."
+# Sent when a player creates a sign but would exceed their limit.
+sign_limit_exceeded: "&cYou cannot create this private sign! Current: {current}/{limit}. This would lock {trying} more chests."
+# Sent when a player is approaching their limit.
+limit_warning: "&eWarning: You only have {remaining} chest locks remaining out of {limit}."
+# Sent when a player has reached their limit.
+limit_reached: "&cYou have reached your chest locking limit of {limit}!"
+# Sent to show current limit status after locking.
+limit_status: "&7Chest locks used: {status}"
+# Generic limit error message.
+limit_error: "&cThere was an error checking your chest limit. Please contact an administrator."
+
+# --- Sign Protection Messages ---
+
+# Sent when no chest is found near a [Private] sign.
+sign_no_chest_found: "&cNo chest found near this sign. Place the sign on or next to a chest."
+# Sent when trying to create a [Private] sign on an already locked chest.
+sign_chest_already_locked: "&cThis chest is already locked."
+# Sent when trying to create a [Private] sign on a chest owned by someone else.
+sign_not_your_chest: "&cYou cannot create a private sign for someone else's chest."
+# Sent when a chest is successfully locked via sign.
+sign_chest_locked: "&aChest locked successfully with private sign!"
+# Sent when sign-based locking fails.
+sign_lock_failed: "&cFailed to lock chest with sign."
+# Sent when trying to break someone else's private sign.
+sign_cannot_break: "&cYou cannot break this private sign."
+# Sent when a chest is unlocked by breaking its private sign.
+sign_chest_unlocked: "&aChest unlocked by removing private sign."
+# Sent when an admin breaks a private sign.
+admin_sign_break_notice: "&e(Admin) You broke a private sign and unlocked the chest."
+
 # --- ClearChests Command (/clearchests) ---
 
 # Sent when the /clearchests command starts.
@@ -61,6 +137,8 @@ reload_success: "&a✔ PrivateChest configuration and messages reloaded successf
 owner_access_notice: "&7(Owner Access)"
 # Sent to an admin when they open a locked container using bypass.
 admin_access_notice: "&6(Admin Access)"
+# Sent to a trusted player when they open a locked container.
+trusted_access_notice: "&b(Trusted Access)"
 # Sent to the owner when they break their locked container.
 chest_break_warning: "&eYou broke your locked container."
 # Sent to an admin when they break a locked container.

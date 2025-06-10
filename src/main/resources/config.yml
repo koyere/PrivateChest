@@ -7,6 +7,18 @@
 # Use standard Bukkit color codes (&) for messages.
 #
 
+# --- Storage Settings ---
+
+# Choose the storage system for chest data.
+# Options: 'yaml' (default) or 'sqlite'
+#
+# YAML: Simple file-based storage, good for small to medium servers.
+# SQLite: Database storage, better performance for large servers with many locked chests.
+#
+# Note: You can migrate between storage types using the /privatechest migrate command.
+# Default: yaml
+storage-type: yaml
+
 # --- Message Prefix Settings ---
 
 # Should the plugin add a prefix before its messages?
@@ -16,6 +28,23 @@ use-prefix: true
 # The prefix to display before messages (only if 'use-prefix' is true).
 # Default: "&7[&6PrivateChest&7] "
 prefix: "&7[&6PrivateChest&7] "
+
+# --- Feature Settings ---
+
+# Enable sign-based protection. Players can lock chests by placing
+# a sign with [Private] on the first line near the chest.
+# Default: true
+enable-sign-protection: true
+
+# Enable chest locking limits based on player permissions.
+# When enabled, players will have a maximum number of chests they can lock.
+# Default: false
+enable-chest-limits: false
+
+# Default number of chests a player can lock if they don't have specific permissions.
+# Only used when enable-chest-limits is true.
+# Default: 5
+default-chest-limit: 5
 
 # --- Notification Settings ---
 
@@ -28,6 +57,11 @@ notify-owner-on-open: true
 # open a container using their bypass permission (privatechest.admin)?
 # Default: true
 notify-admin-on-open: true
+
+# Should a trusted player receive a small notification message when they
+# open a container they have been given access to?
+# Default: true
+notify-trusted-on-open: true
 
 # --- Notes on Removed Options ---
 #

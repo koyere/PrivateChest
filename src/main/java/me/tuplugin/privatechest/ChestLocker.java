@@ -14,12 +14,14 @@ public class ChestLocker {
     // Stores protected chests: location -> owner UUID
     private final Map<Location, String> chestOwners = new HashMap<>();
 
-    // Stores passwords: location -> password
+    // Stores passwords: location -> hashed password
     private final Map<Location, String> chestPasswords = new HashMap<>();
 
     private static ChestLocker instance;
+    private final PrivateChest plugin;
 
     public ChestLocker(PrivateChest plugin) {
+        this.plugin = plugin;
         instance = this;
     }
 
@@ -37,13 +39,22 @@ public class ChestLocker {
             return false; // Already locked
         }
 
+        // Hash the password before storing
+        String hashedPassword = PasswordManager.hashPassword(password);
+        if (hashedPassword == null) {
+            // Hashing failed, log error and fallback to plain text for backward compatibility
+            plugin.getLogger().warning("Failed to hash password for chest at " + serializeLocation(loc) + ". Using plain text as fallback.");
+            hashedPassword = password;
+        }
+
         chestOwners.put(loc, player.getUniqueId().toString());
-        chestPasswords.put(loc, password);
+        chestPasswords.put(loc, hashedPassword);
         return true;
     }
 
     /**
      * Tries to unlock a chest. Returns true if the password is correct.
+     * Automatically migrates plain text passwords to hashed format.
      */
     public boolean unlockChest(Block block, Player player, String password) {
         Location loc = block.getLocation();
@@ -52,8 +63,34 @@ public class ChestLocker {
             return false;
         }
 
-        String correctPassword = chestPasswords.get(loc);
-        return correctPassword != null && correctPassword.equals(password);
+        String storedPassword = chestPasswords.get(loc);
+        if (storedPassword == null) {
+            return false;
+        }
+
+        // Check if stored password is in plain text (legacy format)
+        if (PasswordManager.isPlainText(storedPassword)) {
+            // Legacy plain text comparison
+            boolean isCorrect = storedPassword.equals(password);
+
+            if (isCorrect) {
+                // Migrate to hashed format
+                String hashedPassword = PasswordManager.migratePlainPassword(password);
+                if (hashedPassword != null) {
+                    chestPasswords.put(loc, hashedPassword);
+                    plugin.getLogger().info("Migrated plain text password to hashed format for chest at " + serializeLocation(loc));
+                    // Save the migration immediately
+                    plugin.getDataManager().saveData();
+                } else {
+                    plugin.getLogger().warning("Failed to migrate password for chest at " + serializeLocation(loc));
+                }
+            }
+
+            return isCorrect;
+        } else {
+            // Use secure hash verification
+            return PasswordManager.verifyPassword(password, storedPassword);
+        }
     }
 
     /**
@@ -69,6 +106,15 @@ public class ChestLocker {
     public boolean isOwner(Block block, Player player) {
         String ownerUUID = chestOwners.get(block.getLocation());
         return ownerUUID != null && ownerUUID.equals(player.getUniqueId().toString());
+    }
+
+    /**
+     * Gets the owner UUID of a chest.
+     * @param block The chest block.
+     * @return The owner's UUID as string, or null if not locked.
+     */
+    public String getOwnerUUID(Block block) {
+        return chestOwners.get(block.getLocation());
     }
 
     /**
@@ -89,6 +135,35 @@ public class ChestLocker {
 
     public Map<Location, String> getChestPasswords() {
         return chestPasswords;
+    }
+
+    /**
+     * Migrates all plain text passwords to hashed format.
+     * Called during plugin startup or reload.
+     */
+    public void migrateAllPasswords() {
+        int migrated = 0;
+        boolean dataChanged = false;
+
+        for (Map.Entry<Location, String> entry : chestPasswords.entrySet()) {
+            String currentPassword = entry.getValue();
+
+            if (PasswordManager.isPlainText(currentPassword)) {
+                String hashedPassword = PasswordManager.migratePlainPassword(currentPassword);
+                if (hashedPassword != null) {
+                    entry.setValue(hashedPassword);
+                    migrated++;
+                    dataChanged = true;
+                } else {
+                    plugin.getLogger().warning("Failed to migrate password for chest at " + serializeLocation(entry.getKey()));
+                }
+            }
+        }
+
+        if (dataChanged) {
+            plugin.getDataManager().saveData();
+            plugin.getLogger().info("Successfully migrated " + migrated + " plain text passwords to hashed format.");
+        }
     }
 
     /**

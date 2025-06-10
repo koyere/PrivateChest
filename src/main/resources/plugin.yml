@@ -1,6 +1,6 @@
 # Main plugin definition
 name: PrivateChest
-version: 1.6.3
+version: 2.0
 main: me.tuplugin.privatechest.PrivateChest
 # Minimum Spigot/Paper API version required (1.16 ensures modern methods)
 api-version: 1.16
@@ -29,10 +29,18 @@ commands:
     description: Remove orphaned container entries from data.yml.
     usage: /clearchests
 
+  trust:
+    description: Give another player access to your locked containers.
+    usage: /trust <player> or /trust list
+
+  untrust:
+    description: Remove access from a player to your locked containers.
+    usage: /untrust <player> or /untrust all
+
 # Permission definitions
 permissions:
   privatechest.use:
-    description: Allows players to use /lockchest and /unlockchest.
+    description: Allows players to use /lockchest, /unlockchest, /trust, and /untrust.
     # Defaults to true, so all players can use it unless a permission plugin overrides it.
     default: true
 
@@ -40,3 +48,52 @@ permissions:
     description: Allows use of admin commands and bypass protection.
     # Defaults to op, so only server operators have admin rights by default.
     default: op
+
+  # Chest limit permissions
+  privatechest.limit.unlimited:
+    description: Allows unlimited chest locks.
+    default: false
+
+  privatechest.limit.1000:
+    description: Allows locking up to 1000 chests.
+    default: false
+
+  privatechest.limit.500:
+    description: Allows locking up to 500 chests.
+    default: false
+
+  privatechest.limit.100:
+    description: Allows locking up to 100 chests.
+    default: false
+
+  privatechest.limit.50:
+    description: Allows locking up to 50 chests.
+    default: false
+
+  privatechest.limit.25:
+    description: Allows locking up to 25 chests.
+    default: false
+
+  privatechest.limit.20:
+    description: Allows locking up to 20 chests.
+    default: false
+
+  privatechest.limit.15:
+    description: Allows locking up to 15 chests.
+    default: false
+
+  privatechest.limit.10:
+    description: Allows locking up to 10 chests.
+    default: false
+
+  privatechest.limit.5:
+    description: Allows locking up to 5 chests.
+    default: false
+
+  privatechest.limit.3:
+    description: Allows locking up to 3 chests.
+    default: false
+
+  privatechest.limit.1:
+    description: Allows locking up to 1 chest.
+    default: false

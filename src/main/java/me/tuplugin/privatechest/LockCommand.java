@@ -19,11 +19,13 @@ public class LockCommand implements CommandExecutor {
 
     private final PrivateChest plugin;
     private final ChestLocker chestLocker;
+    private final LimitManager limitManager;
     private final MessageManager messages;
 
     public LockCommand(PrivateChest plugin) {
         this.plugin = plugin;
         this.chestLocker = ChestLocker.getInstance();
+        this.limitManager = LimitManager.getInstance();
         this.messages = plugin.getMessageManager();
     }
 
@@ -103,6 +105,25 @@ public class LockCommand implements CommandExecutor {
             }
         }
 
+        // Check chest limits (only if not admin)
+        if (!player.hasPermission("privatechest.admin") && limitManager.areLimitsEnabled()) {
+            if (!limitManager.canPlayerLockAdditional(player, blocksToLock.size())) {
+                int limit = limitManager.getPlayerLimit(player);
+                int current = limitManager.getPlayerChestCount(player);
+
+                if (limit == -1) {
+                    // This shouldn't happen but just in case
+                    player.sendMessage(messages.get("limit_error"));
+                } else {
+                    player.sendMessage(messages.get("limit_exceeded")
+                            .replace("{current}", String.valueOf(current))
+                            .replace("{limit}", String.valueOf(limit))
+                            .replace("{trying}", String.valueOf(blocksToLock.size())));
+                }
+                return true;
+            }
+        }
+
         // Lock all parts
         boolean allLockedSuccessfully = true;
         for (Block block : blocksToLock) {
@@ -116,6 +137,18 @@ public class LockCommand implements CommandExecutor {
         if (allLockedSuccessfully) {
             plugin.getDataManager().saveData();
             player.sendMessage(messages.get("locked"));
+
+            // Send limit warning if applicable
+            String warningMessage = limitManager.getLimitWarningMessage(player);
+            if (warningMessage != null) {
+                player.sendMessage(warningMessage);
+            }
+
+            // Show current limit status if limits are enabled
+            if (limitManager.areLimitsEnabled() && !player.hasPermission("privatechest.admin")) {
+                String status = limitManager.getLimitStatus(player);
+                player.sendMessage(messages.get("limit_status").replace("{status}", status));
+            }
         } else {
             player.sendMessage(messages.get("error_generic"));
         }
