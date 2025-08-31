@@ -8,6 +8,7 @@ import org.bukkit.World;
 import java.io.File;
 import java.sql.*;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * SQLite-based storage implementation for chest data.
@@ -249,5 +250,31 @@ public class SqliteStorage implements DataStorage {
             plugin.getLogger().warning("[PrivateChest] Failed to update chest in SQLite: " + e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * Implementation of the extended loadData method for compatibility.
+     * Currently only supports chest data; names and trust relations are ignored.
+     * This is a temporary implementation for v2.1 basic compatibility.
+     */
+    @Override
+    public boolean loadData(Map<Location, String> owners, Map<Location, String> passwords,
+                           Map<Location, String> containerNames, Map<String, Set<String>> trustRelations) {
+        // For now, delegate to the existing method and ignore additional parameters
+        // Full SQLite implementation for names and trust will be added in future updates
+        return loadData(owners, passwords);
+    }
+
+    /**
+     * Implementation of the extended saveData method for compatibility.
+     * Currently only supports chest data; names and trust relations are ignored.
+     * This is a temporary implementation for v2.1 basic compatibility.
+     */
+    @Override
+    public boolean saveData(Map<Location, String> owners, Map<Location, String> passwords,
+                           Map<Location, String> containerNames, Map<String, Set<String>> trustRelations) {
+        // For now, delegate to the existing method and ignore additional parameters
+        // Full SQLite implementation for names and trust will be added in future updates
+        return saveData(owners, passwords);
     }
 }

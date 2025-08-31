@@ -131,6 +131,36 @@ no_chests_to_clean: "&aNo orphaned container entries found to clean."
 # Sent when the configuration is successfully reloaded.
 reload_success: "&a✔ PrivateChest configuration and messages reloaded successfully."
 
+# --- Security Protection Messages ---
+
+# Sent when a player tries to place an automated extraction block near a protected container.
+automated_block_placement_denied: "&cYou cannot place {block} near a protected container."
+
+# --- Container Renaming Messages ---
+
+# Usage message for the /renamecontainer command.
+usage_rename_container: "&eUsage: /renamecontainer <name> or /renamecontainer remove"
+# Sent when a container is successfully renamed.
+container_name_set: "&aContainer renamed to '&f{name}&a'."
+# Sent when a container name is successfully removed.
+container_name_removed: "&aCustom name removed from {container}."
+# Sent when trying to rename a container that isn't protected.
+container_not_protected: "&cThis container is not protected."
+# Sent when trying to rename a container you don't own.
+container_not_owned: "&cYou can only rename containers you own."
+# Sent when trying to remove a name from a container that doesn't have one.
+container_no_custom_name: "&cThis container doesn't have a custom name to remove."
+# Sent when the proposed name is empty.
+name_empty: "&cContainer name cannot be empty."
+# Sent when the proposed name is too short.
+name_too_short: "&cContainer name must be at least {details} characters long."
+# Sent when the proposed name is too long.
+name_too_long: "&cContainer name cannot exceed {details} characters."
+# Sent when the proposed name contains invalid characters.
+name_invalid_characters: "&cContainer name can only contain letters, numbers, spaces, hyphens, and underscores."
+# Sent when the proposed name is forbidden.
+name_forbidden: "&cThis name is not allowed."
+
 # --- Notifications & Warnings ---
 
 # Sent to the owner when they open their own locked container.

@@ -46,6 +46,47 @@ enable-chest-limits: false
 # Default: 5
 default-chest-limit: 5
 
+# --- Container Limits (Granular) ---
+
+# Advanced container limits system that allows different limits per container type.
+# This provides more granular control compared to the basic chest limits above.
+# When enabled, this system takes precedence over the basic limits.
+container-limits:
+  # Enable granular container limits by type
+  # Default: false (uses basic chest limits instead)
+  enabled: false
+  
+  # Default limit for all container types if no specific limit is set
+  # Default: 5
+  default-limit: 5
+  
+  # Specific limits by container type
+  # Players need specific permissions to exceed these defaults
+  types:
+    # Standard containers
+    chest: 10
+    trapped_chest: 5
+    barrel: 5
+    
+    # Shulker boxes (more valuable, lower limits)
+    shulker_box: 2
+    white_shulker_box: 1
+    orange_shulker_box: 1
+    magenta_shulker_box: 1
+    light_blue_shulker_box: 1
+    yellow_shulker_box: 1
+    lime_shulker_box: 1
+    pink_shulker_box: 1
+    gray_shulker_box: 1
+    light_gray_shulker_box: 1
+    cyan_shulker_box: 1
+    purple_shulker_box: 1
+    blue_shulker_box: 1
+    brown_shulker_box: 1
+    green_shulker_box: 1
+    red_shulker_box: 1
+    black_shulker_box: 1
+
 # --- Notification Settings ---
 
 # Should the owner receive a small notification message when they
@@ -62,6 +103,19 @@ notify-admin-on-open: true
 # open a container they have been given access to?
 # Default: true
 notify-trusted-on-open: true
+
+# --- Auto-Cleanup Settings ---
+
+# Automatic cleanup of orphaned container data and trust relationships.
+# This helps maintain database integrity and performance by removing
+# data for containers that no longer exist in the world.
+auto-cleanup:
+  # Enable periodic automatic cleanup (every 30 minutes)
+  # Default: true
+  periodic-enabled: true
+  
+  # Startup cleanup is always performed regardless of this setting
+  # This setting only controls the periodic cleanup task
 
 # --- Notes on Removed Options ---
 #

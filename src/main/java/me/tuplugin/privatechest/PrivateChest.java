@@ -15,6 +15,9 @@ public class PrivateChest extends JavaPlugin {
     private ChestLocker chestLocker;
     private TrustManager trustManager;
     private LimitManager limitManager;
+    private AutoCleanupManager autoCleanupManager;
+    private ContainerNameManager containerNameManager;
+    private BedrockUtils bedrockUtils;
 
     @Override
     public void onEnable() {
@@ -44,7 +47,17 @@ public class PrivateChest extends JavaPlugin {
 
         limitManager = new LimitManager(this);
 
+        // Initialize container name manager
+        containerNameManager = new ContainerNameManager(this);
+
+        // Initialize Bedrock utilities
+        bedrockUtils = new BedrockUtils(this);
+
         dataManager = new DataManager(this);
+
+        // Initialize auto-cleanup manager
+        autoCleanupManager = new AutoCleanupManager(this);
+        autoCleanupManager.initialize();
 
         // Migrate plain text passwords to hashed format after data is loaded
         getLogger().info("Checking for plain text passwords to migrate...");
@@ -57,9 +70,10 @@ public class PrivateChest extends JavaPlugin {
         getCommand("clearchests").setExecutor(new ClearChestsCommand(this));
         getCommand("trust").setExecutor(new TrustCommand(this));
         getCommand("untrust").setExecutor(new UntrustCommand(this));
+        getCommand("renamecontainer").setExecutor(new RenameCommand(this));
         getServer().getPluginManager().registerEvents(new ChestListener(this), this);
         getServer().getPluginManager().registerEvents(new BlockProtectionListener(this), this);
-        getServer().getPluginManager().registerEvents(new HopperProtectionListener(), this);
+        getServer().getPluginManager().registerEvents(new HopperProtectionListener(this), this);
         getServer().getPluginManager().registerEvents(new SignProtectionListener(this), this);
 
         getLogger().info("✅ PrivateChest has been enabled successfully.");
@@ -67,6 +81,11 @@ public class PrivateChest extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        // Shutdown auto-cleanup manager
+        if (autoCleanupManager != null) {
+            autoCleanupManager.shutdown();
+        }
+        
         // Close storage connection properly
         if (dataManager != null) {
             dataManager.close();
@@ -97,5 +116,17 @@ public class PrivateChest extends JavaPlugin {
 
     public LimitManager getLimitManager() {
         return limitManager;
+    }
+
+    public AutoCleanupManager getAutoCleanupManager() {
+        return autoCleanupManager;
+    }
+
+    public ContainerNameManager getContainerNameManager() {
+        return containerNameManager;
+    }
+
+    public BedrockUtils getBedrockUtils() {
+        return bedrockUtils;
     }
 }

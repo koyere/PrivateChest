@@ -62,9 +62,23 @@ public class DataManager {
         ChestLocker chestLocker = ChestLocker.getInstance();
         Map<Location, String> owners = chestLocker.getChestOwners();
         Map<Location, String> passwords = chestLocker.getChestPasswords();
+        
+        // Get container names and trust relations maps
+        ContainerNameManager nameManager = plugin.getContainerNameManager();
+        TrustManager trustManager = plugin.getTrustManager();
+        
+        Map<Location, String> containerNames = nameManager != null ? 
+            new java.util.concurrent.ConcurrentHashMap<>() : null;
+        Map<String, java.util.Set<String>> trustRelations = trustManager != null ? 
+            trustManager.getAllTrustRelations() : null;
 
-        if (!storage.loadData(owners, passwords)) {
-            plugin.getLogger().severe("[PrivateChest] Failed to load chest data from storage!");
+        if (!storage.loadData(owners, passwords, containerNames, trustRelations)) {
+            plugin.getLogger().severe("[PrivateChest] Failed to load data from storage!");
+        } else {
+            // Load container names into the name manager
+            if (nameManager != null && containerNames != null) {
+                nameManager.loadContainerNames(containerNames);
+            }
         }
     }
 
@@ -80,9 +94,18 @@ public class DataManager {
         ChestLocker chestLocker = ChestLocker.getInstance();
         Map<Location, String> owners = chestLocker.getChestOwners();
         Map<Location, String> passwords = chestLocker.getChestPasswords();
+        
+        // Get container names and trust relations for saving
+        ContainerNameManager nameManager = plugin.getContainerNameManager();
+        TrustManager trustManager = plugin.getTrustManager();
+        
+        Map<Location, String> containerNames = nameManager != null ? 
+            nameManager.getAllContainerNames() : null;
+        Map<String, java.util.Set<String>> trustRelations = trustManager != null ? 
+            trustManager.getAllTrustRelations() : null;
 
-        if (!storage.saveData(owners, passwords)) {
-            plugin.getLogger().severe("[PrivateChest] Failed to save chest data to storage!");
+        if (!storage.saveData(owners, passwords, containerNames, trustRelations)) {
+            plugin.getLogger().severe("[PrivateChest] Failed to save data to storage!");
         }
     }
 

@@ -1,8 +1,11 @@
 package me.tuplugin.privatechest;
 
+import me.tuplugin.privatechest.enums.ContainerType;
 import org.bukkit.Location;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -56,6 +59,149 @@ public class LimitManager {
         }
 
         return maxLimit;
+    }
+
+    /**
+     * Gets the maximum number of containers of a specific type a player can lock.
+     * This method supports granular limits per container type (chest, barrel, shulker_box).
+     * 
+     * @param player The player to check
+     * @param containerType The specific container type
+     * @return The maximum number of containers of this type, or -1 for unlimited
+     */
+    public int getPlayerLimitForType(Player player, ContainerType containerType) {
+        // Check if granular limits are enabled
+        if (!plugin.getConfig().getBoolean("container-limits.enabled", false)) {
+            // Fall back to legacy global limits
+            return getPlayerLimit(player);
+        }
+
+        // Check for unlimited permission (global or type-specific)
+        if (player.hasPermission("privatechest.limit.unlimited") ||
+            player.hasPermission("privatechest.limit." + containerType.getConfigName() + ".unlimited")) {
+            return -1; // Unlimited
+        }
+
+        // Get default limit for this container type
+        int maxLimit = plugin.getConfig().getInt("container-limits.types." + containerType.getConfigName(), 
+                plugin.getConfig().getInt("container-limits.default-limit", 5));
+
+        // Check for specific numeric limits for this container type
+        int[] checkLimits = {1000, 500, 100, 50, 25, 20, 15, 10, 5, 3, 1};
+
+        for (int limit : checkLimits) {
+            if (player.hasPermission("privatechest.limit." + containerType.getConfigName() + "." + limit)) {
+                maxLimit = Math.max(maxLimit, limit);
+                break; // Take the first (highest) match
+            }
+        }
+
+        return maxLimit;
+    }
+
+    /**
+     * Gets the current number of containers of a specific type locked by a player.
+     * 
+     * @param player The player to check
+     * @param containerType The specific container type to count
+     * @return The number of locked containers of this type
+     */
+    public int getPlayerContainerCountByType(Player player, ContainerType containerType) {
+        String playerUUID = player.getUniqueId().toString();
+        Map<Location, String> chestOwners = chestLocker.getChestOwners();
+
+        int count = 0;
+        for (Map.Entry<Location, String> entry : chestOwners.entrySet()) {
+            if (playerUUID.equals(entry.getValue())) {
+                Location loc = entry.getKey();
+                if (loc.getWorld() != null) {
+                    Block block = loc.getBlock();
+                    ContainerType blockType = ContainerType.fromMaterial(block.getType());
+                    if (blockType == containerType) {
+                        count++;
+                    }
+                }
+            }
+        }
+
+        return count;
+    }
+
+    /**
+     * Gets a map of container counts by type for a specific player.
+     * 
+     * @param player The player to check
+     * @return Map of ContainerType to count
+     */
+    public Map<ContainerType, Integer> getPlayerContainerCountsByType(Player player) {
+        Map<ContainerType, Integer> counts = new HashMap<>();
+        String playerUUID = player.getUniqueId().toString();
+        Map<Location, String> chestOwners = chestLocker.getChestOwners();
+
+        // Initialize all types to 0
+        for (ContainerType type : ContainerType.values()) {
+            counts.put(type, 0);
+        }
+
+        // Count actual containers
+        for (Map.Entry<Location, String> entry : chestOwners.entrySet()) {
+            if (playerUUID.equals(entry.getValue())) {
+                Location loc = entry.getKey();
+                if (loc.getWorld() != null) {
+                    Block block = loc.getBlock();
+                    ContainerType blockType = ContainerType.fromMaterial(block.getType());
+                    if (blockType != null) {
+                        counts.put(blockType, counts.get(blockType) + 1);
+                    }
+                }
+            }
+        }
+
+        return counts;
+    }
+
+    /**
+     * Checks if a player can lock more containers of a specific type.
+     * 
+     * @param player The player to check
+     * @param containerType The container type to check
+     * @return true if the player can lock more containers of this type
+     */
+    public boolean canPlayerLockMoreOfType(Player player, ContainerType containerType) {
+        int limit = getPlayerLimitForType(player, containerType);
+        if (limit == -1) {
+            return true; // Unlimited
+        }
+
+        int currentCount = getPlayerContainerCountByType(player, containerType);
+        return currentCount < limit;
+    }
+
+    /**
+     * Checks if a player can lock additional containers of a specific type.
+     * 
+     * @param player The player to check
+     * @param containerType The container type to check
+     * @param additionalContainers The number of additional containers to lock
+     * @return true if the player can lock that many more containers of this type
+     */
+    public boolean canPlayerLockAdditionalOfType(Player player, ContainerType containerType, int additionalContainers) {
+        int limit = getPlayerLimitForType(player, containerType);
+        if (limit == -1) {
+            return true; // Unlimited
+        }
+
+        int currentCount = getPlayerContainerCountByType(player, containerType);
+        return (currentCount + additionalContainers) <= limit;
+    }
+
+    /**
+     * Checks if granular container limits are enabled.
+     * 
+     * @return true if granular limits are enabled
+     */
+    public boolean areGranularLimitsEnabled() {
+        return plugin.getConfig().getBoolean("container-limits.enabled", false);
     }
 
     /**

@@ -36,3 +36,8 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+.claude/
+CLAUDE.md
+Changelog2_1.md
+VERSION2_1.md

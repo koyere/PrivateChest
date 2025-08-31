@@ -1,6 +1,6 @@
 # Main plugin definition
 name: PrivateChest
-version: 2.0
+version: 2.1
 main: me.tuplugin.privatechest.PrivateChest
 # Minimum Spigot/Paper API version required (1.16 ensures modern methods)
 api-version: 1.16
@@ -37,10 +37,15 @@ commands:
     description: Remove access from a player to your locked containers.
     usage: /untrust <player> or /untrust all
 
+  renamecontainer:
+    description: Set or remove a custom name for a protected container.
+    usage: /renamecontainer <name> or /renamecontainer remove
+    aliases: [renamechest]
+
 # Permission definitions
 permissions:
   privatechest.use:
-    description: Allows players to use /lockchest, /unlockchest, /trust, and /untrust.
+    description: Allows players to use /lockchest, /unlockchest, /trust, /untrust, and /renamecontainer.
     # Defaults to true, so all players can use it unless a permission plugin overrides it.
     default: true
 
@@ -96,4 +101,52 @@ permissions:
 
   privatechest.limit.1:
     description: Allows locking up to 1 chest.
+    default: false
+
+  # Granular container type limits (examples - more can be added as needed)
+  # Format: privatechest.limit.{container_type}.{number}
+  
+  # Chest limits
+  privatechest.limit.chest.unlimited:
+    description: Allows unlimited chest locks.
+    default: false
+  privatechest.limit.chest.50:
+    description: Allows locking up to 50 chests.
+    default: false
+  privatechest.limit.chest.25:
+    description: Allows locking up to 25 chests.
+    default: false
+  privatechest.limit.chest.10:
+    description: Allows locking up to 10 chests.
+    default: false
+
+  # Barrel limits
+  privatechest.limit.barrel.unlimited:
+    description: Allows unlimited barrel locks.
+    default: false
+  privatechest.limit.barrel.20:
+    description: Allows locking up to 20 barrels.
+    default: false
+  privatechest.limit.barrel.10:
+    description: Allows locking up to 10 barrels.
+    default: false
+  privatechest.limit.barrel.5:
+    description: Allows locking up to 5 barrels.
+    default: false
+
+  # Shulker box limits
+  privatechest.limit.shulker_box.unlimited:
+    description: Allows unlimited shulker box locks.
+    default: false
+  privatechest.limit.shulker_box.10:
+    description: Allows locking up to 10 shulker boxes.
+    default: false
+  privatechest.limit.shulker_box.5:
+    description: Allows locking up to 5 shulker boxes.
+    default: false
+  privatechest.limit.shulker_box.3:
+    description: Allows locking up to 3 shulker boxes.
+    default: false
+  privatechest.limit.shulker_box.1:
+    description: Allows locking up to 1 shulker box.
     default: false

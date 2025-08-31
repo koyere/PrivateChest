@@ -4,12 +4,13 @@ import me.tuplugin.privatechest.PrivateChest;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Map;
+import java.util.*;
 
 /**
  * YAML-based storage implementation for chest data.
@@ -45,15 +46,23 @@ public class YamlStorage implements DataStorage {
     }
 
     @Override
-    public boolean loadData(Map<Location, String> owners, Map<Location, String> passwords) {
+    public boolean loadData(Map<Location, String> owners, Map<Location, String> passwords,
+                           Map<Location, String> containerNames, Map<String, Set<String>> trustRelations) {
         try {
             // Clear maps before loading to avoid duplicates
             owners.clear();
             passwords.clear();
+            if (containerNames != null) {
+                containerNames.clear();
+            }
+            if (trustRelations != null) {
+                trustRelations.clear();
+            }
 
-            // Load data from YAML
-            if (dataConfig.isConfigurationSection("chests")) {
-                for (String key : dataConfig.getConfigurationSection("chests").getKeys(false)) {
+            // Load chest data from YAML
+            ConfigurationSection chestsSection = dataConfig.getConfigurationSection("chests");
+            if (chestsSection != null) {
+                for (String key : chestsSection.getKeys(false)) {
                     Location loc = deserializeLocation(key);
                     String owner = dataConfig.getString("chests." + key + ".owner");
                     String password = dataConfig.getString("chests." + key + ".password");
@@ -61,6 +70,27 @@ public class YamlStorage implements DataStorage {
                     if (loc != null && owner != null && password != null) {
                         owners.put(loc, owner);
                         passwords.put(loc, password);
+                        
+                        // Load container name if provided and exists
+                        if (containerNames != null) {
+                            String name = dataConfig.getString("chests." + key + ".name");
+                            if (name != null && !name.trim().isEmpty()) {
+                                containerNames.put(loc, name.trim());
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Load trust relationships if provided
+            if (trustRelations != null) {
+                ConfigurationSection trustSection = dataConfig.getConfigurationSection("trust");
+                if (trustSection != null) {
+                    for (String ownerUUID : trustSection.getKeys(false)) {
+                        List<String> trustedList = dataConfig.getStringList("trust." + ownerUUID);
+                        if (!trustedList.isEmpty()) {
+                            trustRelations.put(ownerUUID, new HashSet<>(trustedList));
+                        }
                     }
                 }
             }
@@ -75,17 +105,38 @@ public class YamlStorage implements DataStorage {
     }
 
     @Override
-    public boolean saveData(Map<Location, String> owners, Map<Location, String> passwords) {
+    public boolean saveData(Map<Location, String> owners, Map<Location, String> passwords,
+                           Map<Location, String> containerNames, Map<String, Set<String>> trustRelations) {
         try {
             // Clear existing data to avoid old entries
             dataConfig.set("chests", null);
+            dataConfig.set("trust", null);
 
-            // Save current data
+            // Save chest data
             for (Location loc : owners.keySet()) {
                 String path = serializeLocation(loc);
                 if (path != null) {
                     dataConfig.set("chests." + path + ".owner", owners.get(loc));
                     dataConfig.set("chests." + path + ".password", passwords.get(loc));
+                    
+                    // Save container name if provided and exists
+                    if (containerNames != null && containerNames.containsKey(loc)) {
+                        String name = containerNames.get(loc);
+                        if (name != null && !name.trim().isEmpty()) {
+                            dataConfig.set("chests." + path + ".name", name.trim());
+                        }
+                    }
+                }
+            }
+            
+            // Save trust relationships if provided
+            if (trustRelations != null && !trustRelations.isEmpty()) {
+                for (Map.Entry<String, Set<String>> entry : trustRelations.entrySet()) {
+                    String ownerUUID = entry.getKey();
+                    Set<String> trustedUUIDs = entry.getValue();
+                    if (!trustedUUIDs.isEmpty()) {
+                        dataConfig.set("trust." + ownerUUID, new ArrayList<>(trustedUUIDs));
+                    }
                 }
             }
 
