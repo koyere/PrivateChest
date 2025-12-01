@@ -113,9 +113,40 @@ auto-cleanup:
   # Enable periodic automatic cleanup (every 30 minutes)
   # Default: true
   periodic-enabled: true
-  
+
   # Startup cleanup is always performed regardless of this setting
   # This setting only controls the periodic cleanup task
+
+# --- Hopper Protection Settings ---
+
+# Controls whether hoppers and other automated systems can move items
+# to/from locked containers.
+#
+# ⚠️ SECURITY WARNING:
+# Disabling this protection allows ANY hopper (regardless of who placed it)
+# to extract items from locked containers. This may allow other players to
+# steal items using clever hopper placements.
+#
+# RECOMMENDED USE CASES for disabling (allow-hopper-access: true):
+# - Private/trusted servers where theft is not a concern
+# - Servers with claim/protection plugins that prevent hopper placement
+# - Players who want automated sorting systems with their locked chests
+#
+# When enabled, hoppers CAN:
+# - Transfer items into locked containers
+# - Extract items from locked containers
+# - Work with automated sorting/storage systems
+#
+# When disabled (default), hoppers CANNOT:
+# - Move items to or from ANY locked container
+# - Be placed within 1 block of locked containers (prevented automatically)
+#
+# Default: false (maximum security - blocks all hopper access)
+hopper-protection:
+  # Set to true to allow hoppers to access locked containers
+  # Set to false to block all automated item movement (most secure)
+  # Default: false
+  allow-hopper-access: false
 
 # --- Notes on Removed Options ---
 #

@@ -1,6 +1,6 @@
 # Main plugin definition
 name: PrivateChest
-version: 2.1
+version: 2.2
 main: me.tuplugin.privatechest.PrivateChest
 # Minimum Spigot/Paper API version required (1.16 ensures modern methods)
 api-version: 1.16

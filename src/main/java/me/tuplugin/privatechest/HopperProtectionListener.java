@@ -23,7 +23,11 @@ import java.util.Set;
  * Enhanced protection listener that prevents all forms of automated item extraction
  * from protected containers. This includes hoppers, droppers, dispensers, and
  * prevents placement of these blocks near protected containers.
- * 
+ *
+ * Protection can be configured via config.yml:
+ * - When hopper-protection.allow-hopper-access is false (default): Full protection enabled
+ * - When hopper-protection.allow-hopper-access is true: Hoppers can access locked containers
+ *
  * @since 2.1
  * @author PrivateChest Team
  */
@@ -35,7 +39,7 @@ public class HopperProtectionListener implements Listener {
 
     /**
      * Constructs a new HopperProtectionListener.
-     * 
+     *
      * @param plugin The main plugin instance for accessing configuration and managers
      */
     public HopperProtectionListener(PrivateChest plugin) {
@@ -45,13 +49,31 @@ public class HopperProtectionListener implements Listener {
     }
 
     /**
+     * Checks if hopper access is allowed based on configuration.
+     *
+     * @return true if hoppers can access locked containers, false otherwise
+     */
+    private boolean isHopperAccessAllowed() {
+        return plugin.getConfig().getBoolean("hopper-protection.allow-hopper-access", false);
+    }
+
+    /**
      * Prevents automated item movement to or from protected containers.
      * This covers hoppers, droppers, dispensers, and any other automated systems.
-     * 
+     *
+     * Behavior depends on configuration:
+     * - If allow-hopper-access is true: Allows all automated item movement
+     * - If allow-hopper-access is false (default): Blocks all automated access to locked containers
+     *
      * @param event The inventory move event
      */
     @EventHandler(priority = EventPriority.HIGH)
     public void onInventoryMove(InventoryMoveItemEvent event) {
+        // If hopper access is explicitly allowed in config, don't block any movement
+        if (isHopperAccessAllowed()) {
+            return;
+        }
+
         // Check both the source and the destination inventory for protection
         boolean sourceProtected = isInventoryProtected(event.getSource());
         boolean destinationProtected = isInventoryProtected(event.getDestination());
@@ -65,7 +87,11 @@ public class HopperProtectionListener implements Listener {
     /**
      * Prevents placement of automated extraction blocks near protected containers.
      * This includes hoppers, droppers, and dispensers within a 2-block radius.
-     * 
+     *
+     * Behavior depends on configuration:
+     * - If allow-hopper-access is true: Allows placement of automated blocks near locked containers
+     * - If allow-hopper-access is false (default): Prevents placement near locked containers
+     *
      * @param event The block place event
      */
     @EventHandler(priority = EventPriority.HIGH)
@@ -76,6 +102,11 @@ public class HopperProtectionListener implements Listener {
 
         // Only check for automated extraction blocks
         if (!isAutomatedExtractionBlock(placedType)) {
+            return;
+        }
+
+        // If hopper access is allowed in config, don't restrict placement
+        if (isHopperAccessAllowed()) {
             return;
         }
 
