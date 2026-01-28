@@ -3,13 +3,17 @@ package me.tuplugin.privatechest;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
-import java.lang.reflect.Method;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
  * Utility class for handling Bedrock Edition players and cross-platform compatibility.
- * Provides detection and adaptation features for Java and Bedrock players using Floodgate.
+ * Provides detection and adaptation features for Java and Bedrock players.
+ * 
+ * Supports:
+ * - Geyser (standalone or as plugin)
+ * - Floodgate (for authentication)
+ * - GeyserMC API for advanced features
  * 
  * @since 2.1
  * @author PrivateChest Team
@@ -18,10 +22,11 @@ public class BedrockUtils {
 
     private final PrivateChest plugin;
     private static boolean floodgateEnabled = false;
-    private static boolean floodgateChecked = false;
+    private static boolean geyserEnabled = false;
+    private static boolean checkedIntegrations = false;
 
-    // Floodgate Bedrock UUID prefix pattern
-    private static final String FLOODGATE_PREFIX = "00000000-0000-0000-0009-";
+    // Floodgate/Geyser Bedrock UUID prefix pattern
+    // Bedrock players get UUIDs starting with 00000000-0000-0000-0009-
     private static final Pattern BEDROCK_UUID_PATTERN = Pattern.compile("^00000000-0000-0000-0009-[0-9a-fA-F]{12}$");
 
     // Character limitations for Bedrock Edition
@@ -35,38 +40,50 @@ public class BedrockUtils {
      */
     public BedrockUtils(PrivateChest plugin) {
         this.plugin = plugin;
-        checkFloodgateAvailability();
+        checkIntegrations();
     }
 
     /**
-     * Checks if Floodgate is available and properly configured.
+     * Checks for Geyser and Floodgate availability.
      * This method is called once during initialization and caches the result.
      */
-    private void checkFloodgateAvailability() {
-        if (floodgateChecked) {
+    private void checkIntegrations() {
+        if (checkedIntegrations) {
             return;
         }
 
+        // Check for Floodgate
         try {
-            // Check if Floodgate plugin is present
             if (Bukkit.getPluginManager().getPlugin("floodgate") != null) {
-                // Try to access Floodgate API to confirm it's working
                 Class.forName("org.geysermc.floodgate.api.FloodgateApi");
                 floodgateEnabled = true;
-                plugin.getLogger().info("[BedrockUtils] Floodgate detected - Bedrock Edition support enabled");
-            } else {
-                floodgateEnabled = false;
-                plugin.getLogger().info("[BedrockUtils] Floodgate not detected - Java Edition only mode");
+                plugin.getLogger().info("[BedrockUtils] Floodgate detected - Full Bedrock authentication support enabled");
             }
         } catch (ClassNotFoundException e) {
-            floodgateEnabled = false;
-            plugin.getLogger().warning("[BedrockUtils] Floodgate plugin found but API not available");
+            plugin.getLogger().fine("[BedrockUtils] Floodgate plugin found but API not available");
         } catch (Exception e) {
-            floodgateEnabled = false;
-            plugin.getLogger().warning("[BedrockUtils] Error checking Floodgate availability: " + e.getMessage());
+            plugin.getLogger().fine("[BedrockUtils] Error checking Floodgate: " + e.getMessage());
         }
 
-        floodgateChecked = true;
+        // Check for Geyser (as plugin, not standalone)
+        try {
+            if (Bukkit.getPluginManager().getPlugin("Geyser-Spigot") != null ||
+                Bukkit.getPluginManager().getPlugin("Geyser-Paper") != null ||
+                Bukkit.getPluginManager().getPlugin("Geyser-Folia") != null) {
+                geyserEnabled = true;
+                plugin.getLogger().info("[BedrockUtils] Geyser detected - Bedrock Edition support enabled");
+            }
+        } catch (Exception e) {
+            plugin.getLogger().fine("[BedrockUtils] Error checking Geyser: " + e.getMessage());
+        }
+
+        // Log final status
+        if (!floodgateEnabled && !geyserEnabled) {
+            plugin.getLogger().info("[BedrockUtils] No Bedrock bridge detected - Java Edition only mode");
+            plugin.getLogger().info("[BedrockUtils] Install Geyser+Floodgate for Bedrock support");
+        }
+
+        checkedIntegrations = true;
     }
 
     /**
@@ -234,6 +251,24 @@ public class BedrockUtils {
      */
     public static boolean isFloodgateAvailable() {
         return floodgateEnabled;
+    }
+
+    /**
+     * Checks if Geyser is available.
+     * 
+     * @return true if Geyser is available
+     */
+    public static boolean isGeyserAvailable() {
+        return geyserEnabled;
+    }
+
+    /**
+     * Checks if any Bedrock bridge is available.
+     * 
+     * @return true if Geyser or Floodgate is available
+     */
+    public static boolean isBedrockBridgeAvailable() {
+        return floodgateEnabled || geyserEnabled;
     }
 
     /**

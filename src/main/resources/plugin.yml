@@ -1,13 +1,17 @@
 # Main plugin definition
 name: PrivateChest
-version: 2.2
+version: '2.3'
 main: me.tuplugin.privatechest.PrivateChest
 # Minimum Spigot/Paper API version required (1.16 ensures modern methods)
-api-version: 1.16
+api-version: '1.16'
+# Folia support - indicates the plugin is compatible with Folia's regionized threading
+folia-supported: true
 author: Koyere
 description: A plugin that allows players to lock chests with a personal password.
 # Optional: Link to your SpigotMC or GitHub page
 website: https://www.spigotmc.org/resources/privatechest.124359/
+# Soft dependencies for optional integrations
+softdepend: [floodgate, Geyser-Spigot, Geyser-Paper, Geyser-Folia]
 
 # Command definitions
 commands:

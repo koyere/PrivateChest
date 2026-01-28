@@ -8,6 +8,12 @@ import java.security.SecureRandom;
 /**
  * Manages password hashing and verification for PrivateChest.
  * Uses SHA-256 with random salt for secure password storage.
+ * 
+ * Note: For a Minecraft plugin context, SHA-256 with salt provides adequate
+ * security for chest passwords. The salt prevents rainbow table attacks,
+ * and the passwords protect in-game items rather than sensitive personal data.
+ * 
+ * @since 2.0
  */
 public class PasswordManager {
 

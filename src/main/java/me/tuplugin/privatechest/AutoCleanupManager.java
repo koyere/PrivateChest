@@ -1,10 +1,10 @@
 package me.tuplugin.privatechest;
 
+import me.tuplugin.privatechest.util.SchedulerUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.Iterator;
@@ -16,6 +16,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * This includes containers that no longer exist in the world or have been
  * replaced with non-lockable blocks. Provides both startup cleanup and
  * periodic maintenance to ensure data integrity.
+ * 
+ * Compatible with Folia through SchedulerUtils.
  * 
  * @since 2.1
  * @author PrivateChest Team
@@ -48,10 +50,11 @@ public class AutoCleanupManager {
     /**
      * Initializes the auto-cleanup system.
      * Schedules both startup cleanup and periodic maintenance.
+     * Uses SchedulerUtils for Folia compatibility.
      */
     public void initialize() {
         // Schedule startup cleanup after server is fully loaded
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+        SchedulerUtils.runTaskLater(plugin, () -> {
             performCleanup(CleanupType.STARTUP);
         }, STARTUP_CLEANUP_DELAY_TICKS);
 
@@ -59,12 +62,9 @@ public class AutoCleanupManager {
         if (isPeriodicCleanupEnabled()) {
             long intervalTicks = PERIODIC_CLEANUP_INTERVAL_MINUTES * 60L * 20L; // Convert to ticks
             
-            periodicCleanupTask = new BukkitRunnable() {
-                @Override
-                public void run() {
-                    performCleanup(CleanupType.PERIODIC);
-                }
-            }.runTaskTimerAsynchronously(plugin, intervalTicks, intervalTicks);
+            periodicCleanupTask = SchedulerUtils.runTaskTimerAsync(plugin, () -> {
+                performCleanup(CleanupType.PERIODIC);
+            }, intervalTicks, intervalTicks);
 
             plugin.getLogger().info("[AutoCleanup] Periodic cleanup scheduled every " + 
                     PERIODIC_CLEANUP_INTERVAL_MINUTES + " minutes");
@@ -104,8 +104,8 @@ public class AutoCleanupManager {
 
         // Save data if anything was cleaned
         if (cleanedContainers.get() > 0 || cleanedTrustRelations.get() > 0) {
-            // Run save operation on main thread
-            Bukkit.getScheduler().runTask(plugin, () -> {
+            // Run save operation on main thread (Folia compatible)
+            SchedulerUtils.runTask(plugin, () -> {
                 dataManager.saveData();
             });
         }

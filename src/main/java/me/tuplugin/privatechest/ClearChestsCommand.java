@@ -75,6 +75,10 @@ public class ClearChestsCommand implements CommandExecutor {
     private boolean isLockableContainer(Block block) {
         if (block == null) return false;
         Material type = block.getType();
-        return type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL;
+        if (type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL) {
+            return true;
+        }
+        // Support all shulker box variants
+        return type.name().contains("SHULKER_BOX");
     }
 }

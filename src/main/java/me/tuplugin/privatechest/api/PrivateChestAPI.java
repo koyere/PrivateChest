@@ -187,9 +187,12 @@ public class PrivateChestAPI {
             throw new IllegalArgumentException("Material cannot be null");
         }
 
-        return material == Material.CHEST ||
-                material == Material.TRAPPED_CHEST ||
-                material == Material.BARREL;
+        if (material == Material.CHEST || material == Material.TRAPPED_CHEST || material == Material.BARREL) {
+            return true;
+        }
+        
+        // Support all shulker box variants
+        return material.name().contains("SHULKER_BOX");
     }
 
     /**

@@ -1,9 +1,8 @@
 package me.tuplugin.privatechest;
 
+import me.tuplugin.privatechest.util.SchedulerUtils;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bstats.bukkit.Metrics;
-import me.tuplugin.privatechest.ReloadCommand;
-import me.tuplugin.privatechest.ClearChestsCommand;
 import me.tuplugin.privatechest.commands.TrustCommand;
 import me.tuplugin.privatechest.commands.UntrustCommand;
 
@@ -22,6 +21,10 @@ public class PrivateChest extends JavaPlugin {
     @Override
     public void onEnable() {
         instance = this;
+
+        // Log server software for debugging
+        getLogger().info("Running on: " + SchedulerUtils.getServerSoftware() + 
+                " (MC " + getServer().getBukkitVersion().split("-")[0] + ")");
 
         // Create plugin folder if it doesn't exist
         if (!getDataFolder().exists()) {
@@ -50,7 +53,7 @@ public class PrivateChest extends JavaPlugin {
         // Initialize container name manager
         containerNameManager = new ContainerNameManager(this);
 
-        // Initialize Bedrock utilities
+        // Initialize Bedrock utilities (Geyser/Floodgate detection)
         bedrockUtils = new BedrockUtils(this);
 
         dataManager = new DataManager(this);
@@ -76,7 +79,7 @@ public class PrivateChest extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new HopperProtectionListener(this), this);
         getServer().getPluginManager().registerEvents(new SignProtectionListener(this), this);
 
-        getLogger().info("✅ PrivateChest has been enabled successfully.");
+        getLogger().info("PrivateChest v" + getDescription().getVersion() + " enabled successfully!");
     }
 
     @Override
@@ -90,7 +93,7 @@ public class PrivateChest extends JavaPlugin {
         if (dataManager != null) {
             dataManager.close();
         }
-        getLogger().info("⛔ PrivateChest has been disabled.");
+        getLogger().info("PrivateChest disabled.");
     }
 
     // Getters

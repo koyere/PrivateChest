@@ -184,6 +184,10 @@ public class LockCommand implements CommandExecutor {
     }
 
     private boolean isLockableContainer(Material type) {
-        return type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL;
+        if (type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL) {
+            return true;
+        }
+        // Support all shulker box variants
+        return type.name().contains("SHULKER_BOX");
     }
 }

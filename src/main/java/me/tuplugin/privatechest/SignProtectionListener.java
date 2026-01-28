@@ -335,6 +335,10 @@ public class SignProtectionListener implements Listener {
      * Checks if a material is a lockable container.
      */
     private boolean isLockableContainer(Material type) {
-        return type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL;
+        if (type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL) {
+            return true;
+        }
+        // Support all shulker box variants
+        return type.name().contains("SHULKER_BOX");
     }
 }

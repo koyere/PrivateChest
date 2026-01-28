@@ -33,6 +33,10 @@ public class ChestLocker {
      * Locks the given chest block with a password and owner.
      */
     public boolean lockChest(Block block, Player player, String password) {
+        if (block == null || player == null || password == null || password.isEmpty()) {
+            return false;
+        }
+        
         Location loc = block.getLocation();
 
         if (chestOwners.containsKey(loc)) {
@@ -42,9 +46,9 @@ public class ChestLocker {
         // Hash the password before storing
         String hashedPassword = PasswordManager.hashPassword(password);
         if (hashedPassword == null) {
-            // Hashing failed, log error and fallback to plain text for backward compatibility
-            plugin.getLogger().warning("Failed to hash password for chest at " + serializeLocation(loc) + ". Using plain text as fallback.");
-            hashedPassword = password;
+            // Hashing failed, log error and return false for security
+            plugin.getLogger().warning("Failed to hash password for chest at " + serializeLocation(loc) + ". Lock operation aborted.");
+            return false;
         }
 
         chestOwners.put(loc, player.getUniqueId().toString());

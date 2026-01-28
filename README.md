@@ -8,16 +8,18 @@ No complicated land-claim systems required — simple, secure, and optimized for
 
 ## ✨ Features
 
-- 🔒 Lock chests and barrels with a password.
-- 🔑 Unlock your own chest with the correct password.
-- 👤 Only the owner can access protected chests.
+- 🔒 Lock chests, barrels, and shulker boxes with a password.
+- 🔑 Unlock your own containers with the correct password.
+- 👤 Only the owner can access protected containers.
 - 💥 Protection against TNT, creeper, and explosion damages.
-- 📦 Support for double chests and barrels.
+- 📦 Support for double chests and all shulker box variants.
+- 🤝 Trust system - give other players access without sharing passwords.
 - 🔁 Reload configuration and messages live with `/privatechest reload`.
-- 🧹 Clean orphaned chest data with `/clearchests`.
+- 🧹 Automatic cleanup of orphaned container data.
 - 🎨 Customizable prefix and full message control.
 - 🌐 Multilingual ready — translate easily via `messages.yml` and `config.yml`.
 - 📊 bStats integration to anonymously monitor plugin usage.
+- 🎮 Bedrock Edition support via Floodgate.
 
 ---
 
@@ -53,10 +55,33 @@ notify-owner-on-open: true
 messages.yml
 Easily edit all plugin messages to your preferred language!
 
-✅ Compatibility
-Minecraft Versions: 1.16.x ➔ 1.21.5
+## ✅ Compatibility
 
-Supported forks: Paper, Pufferfish, Purpur
+### Minecraft Versions
+**Supported:** 1.16.5 → 1.21.x
+
+### Server Software
+
+**Standard (Single-threaded):**
+- CraftBukkit
+- Spigot
+- Paper
+- Purpur
+- Pufferfish
+- Any Spigot/Paper fork
+
+**Regionized (Multi-threaded):**
+- Folia
+- Luminol
+- LightingLuminol
+- LeafMC
+- Kaiiju
+- Any Folia-based fork
+
+### Cross-Platform (Java + Bedrock)
+- Geyser (standalone or plugin)
+- Floodgate (for authentication)
+- Full support for Bedrock Edition players
 
 📊 Plugin Statistics
 View usage data at:
