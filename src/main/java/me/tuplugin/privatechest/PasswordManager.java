@@ -61,9 +61,12 @@ public class PasswordManager {
 
             // Hash the provided password with the stored salt
             String actualHash = hashWithSalt(password, salt);
+            if (actualHash == null) return false;
 
-            // Compare hashes
-            return expectedHash != null && expectedHash.equals(actualHash);
+            // Timing-safe comparison to prevent timing attacks
+            byte[] expectedBytes = expectedHash.getBytes(StandardCharsets.UTF_8);
+            byte[] actualBytes = actualHash.getBytes(StandardCharsets.UTF_8);
+            return MessageDigest.isEqual(expectedBytes, actualBytes);
         } catch (Exception e) {
             return false;
         }

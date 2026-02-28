@@ -1,19 +1,13 @@
 package me.tuplugin.privatechest;
 
-import org.bukkit.Material;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace; // Importado
-import org.bukkit.block.BlockState; // Importado
-import org.bukkit.block.data.BlockData; // Importado
-import org.bukkit.block.data.type.Chest; // Importado
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEvent;
 
-import java.util.HashSet;
-import java.util.Set; // Importado
+import java.util.Set;
 
 public class ChestListener implements Listener {
 
@@ -42,12 +36,12 @@ public class ChestListener implements Listener {
         Player player = event.getPlayer();
 
         // Ensure it's a lockable container
-        if (!isLockableContainer(clickedBlock.getType())) {
+        if (!ContainerUtils.isLockableContainer(clickedBlock.getType())) {
             return;
         }
 
-        // --- INICIO: Lógica de Cofre Doble ---
-        Set<Block> containerBlocks = getContainerBlocks(clickedBlock);
+        // Get all blocks of the container (handles double chests)
+        Set<Block> containerBlocks = ContainerUtils.getContainerBlocks(clickedBlock);
         Block lockedBlock = null;
 
         // Check if ANY part of the container is locked
@@ -57,7 +51,6 @@ public class ChestListener implements Listener {
                 break;
             }
         }
-        // --- FIN: Lógica de Cofre Doble ---
 
         // If no part is locked, allow access (do nothing)
         if (lockedBlock == null) {
@@ -96,6 +89,7 @@ public class ChestListener implements Listener {
         event.setCancelled(true);
         player.sendMessage(messages.get("not_your_chest"));
     }
+<<<<<<< HEAD
 
     /**
      * Gets all blocks belonging to a container (1 for single, 2 for double).
@@ -167,4 +161,6 @@ public class ChestListener implements Listener {
         // Support all shulker box variants
         return type.name().contains("SHULKER_BOX");
     }
+=======
+>>>>>>> 22e8436 (Version 2.3.1)
 }

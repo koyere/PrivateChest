@@ -1,11 +1,13 @@
 package me.tuplugin.privatechest;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
-import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.type.Chest;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -15,9 +17,6 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
-
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * Enhanced protection listener that prevents all forms of automated item extraction
@@ -163,73 +162,24 @@ public class HopperProtectionListener implements Listener {
         return false; // No part was locked
     }
 
-    // --- Helper Methods (Copied from other listeners/commands) ---
+    // --- Helper Methods ---
     private Set<Block> getContainerBlocks(Block block) {
-        Set<Block> blocks = new HashSet<>();
-        if(block == null || !isLockableContainer(block.getType())) {
-            return blocks; // Return empty if not a valid start block
-        }
-        blocks.add(block);
-
-        BlockState state = block.getState();
-        BlockData blockData = block.getBlockData();
-
-        if (state instanceof org.bukkit.block.Chest && blockData instanceof Chest) {
-            Chest chestData = (Chest) blockData;
-            Chest.Type chestType = chestData.getType();
-
-            if (chestType != Chest.Type.SINGLE) {
-                BlockFace facing = chestData.getFacing();
-                BlockFace otherHalfDirection = getOtherChestHalfDirection(chestType, facing);
-
-                if (otherHalfDirection != null) {
-                    Block otherBlock = block.getRelative(otherHalfDirection);
-                    if (otherBlock.getState() instanceof org.bukkit.block.Chest) {
-                        blocks.add(otherBlock);
-                    }
-                }
-            }
-        }
-        return blocks;
+        return ContainerUtils.getContainerBlocks(block);
     }
 
     private BlockFace getOtherChestHalfDirection(Chest.Type type, BlockFace facing) {
-        if (type == Chest.Type.LEFT) {
-            switch (facing) {
-                case NORTH: return BlockFace.EAST;
-                case EAST:  return BlockFace.SOUTH;
-                case SOUTH: return BlockFace.WEST;
-                case WEST:  return BlockFace.NORTH;
-                default:    return null;
-            }
-        } else if (type == Chest.Type.RIGHT) {
-            switch (facing) {
-                case NORTH: return BlockFace.WEST;
-                case EAST:  return BlockFace.NORTH;
-                case SOUTH: return BlockFace.EAST;
-                case WEST:  return BlockFace.SOUTH;
-                default:    return null;
-            }
-        }
-        return null;
+        return ContainerUtils.getOtherChestHalfDirection(type, facing);
     }
 
     /**
      * Checks if a material represents a lockable container type.
-     * Supports chests, trapped chests, barrels, and all shulker box variants.
+     * Delegates to ContainerUtils for consistent behavior across the plugin.
      * 
      * @param type The material to check
      * @return true if the material is a lockable container
      */
     private boolean isLockableContainer(Material type) {
-        // Standard containers
-        if (type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL) {
-            return true;
-        }
-        
-        // All shulker box variants (handles future additions automatically)
-        String typeName = type.name();
-        return typeName.contains("SHULKER_BOX");
+        return ContainerUtils.isLockableContainer(type);
     }
 
     /**

@@ -5,8 +5,6 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Sign;
-import org.bukkit.block.data.BlockData;
-import org.bukkit.block.data.type.Chest;
 import org.bukkit.block.data.type.WallSign;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -54,8 +52,8 @@ public class SignProtectionListener implements Listener {
             return;
         }
 
-        // Check permission
-        if (!player.hasPermission("privatechest.use")) {
+        // Check permission - sign protection is equivalent to locking
+        if (!player.hasPermission("privatechest.lock")) {
             player.sendMessage(messages.raw("no_permission"));
             event.setCancelled(true);
             return;
@@ -265,63 +263,29 @@ public class SignProtectionListener implements Listener {
      * Gets all blocks belonging to a container (handles double chests).
      */
     private Set<Block> getContainerBlocks(Block block) {
-        Set<Block> blocks = new HashSet<>();
-        blocks.add(block);
-
-        BlockState state = block.getState();
-        BlockData blockData = block.getBlockData();
-
-        if (state instanceof org.bukkit.block.Chest && blockData instanceof Chest) {
-            Chest chestData = (Chest) blockData;
-            Chest.Type chestType = chestData.getType();
-
-            if (chestType != Chest.Type.SINGLE) {
-                BlockFace facing = chestData.getFacing();
-                BlockFace otherHalfDirection = getOtherChestHalfDirection(chestType, facing);
-
-                if (otherHalfDirection != null) {
-                    Block otherBlock = block.getRelative(otherHalfDirection);
-                    if (otherBlock.getState() instanceof org.bukkit.block.Chest) {
-                        blocks.add(otherBlock);
-                    }
-                }
-            }
-        }
-        return blocks;
+        return ContainerUtils.getContainerBlocks(block);
     }
 
     /**
-     * Helper method for double chest logic.
+     * Checks if a material is a lockable container.
      */
-    private BlockFace getOtherChestHalfDirection(Chest.Type type, BlockFace facing) {
-        if (type == Chest.Type.LEFT) {
-            switch (facing) {
-                case NORTH: return BlockFace.EAST;
-                case EAST:  return BlockFace.SOUTH;
-                case SOUTH: return BlockFace.WEST;
-                case WEST:  return BlockFace.NORTH;
-                default:    return null;
-            }
-        } else if (type == Chest.Type.RIGHT) {
-            switch (facing) {
-                case NORTH: return BlockFace.WEST;
-                case EAST:  return BlockFace.NORTH;
-                case SOUTH: return BlockFace.EAST;
-                case WEST:  return BlockFace.SOUTH;
-                default:    return null;
-            }
-        }
-        return null;
+    private boolean isLockableContainer(Material type) {
+        return ContainerUtils.isLockableContainer(type);
     }
 
     /**
-     * Generates a unique password for sign-based protection.
+     * Generates a cryptographically secure password for sign-based protection.
+     * Uses SecureRandom for unpredictable passwords.
      */
     private String generateSignPassword(Player player, Block signBlock) {
-        // Create a password based on player UUID and sign location
-        String base = player.getUniqueId().toString() + "_" +
-                signBlock.getX() + "_" + signBlock.getY() + "_" + signBlock.getZ();
-        return "sign_" + Integer.toHexString(base.hashCode());
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        byte[] bytes = new byte[16];
+        random.nextBytes(bytes);
+        StringBuilder sb = new StringBuilder("sign_");
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
     }
 
     /**
@@ -330,6 +294,7 @@ public class SignProtectionListener implements Listener {
     private boolean isSign(Material material) {
         return material.name().contains("SIGN");
     }
+<<<<<<< HEAD
 
     /**
      * Checks if a material is a lockable container.
@@ -341,4 +306,6 @@ public class SignProtectionListener implements Listener {
         // Support all shulker box variants
         return type.name().contains("SHULKER_BOX");
     }
+=======
+>>>>>>> 22e8436 (Version 2.3.1)
 }

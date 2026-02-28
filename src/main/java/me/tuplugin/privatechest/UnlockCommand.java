@@ -1,18 +1,12 @@
 package me.tuplugin.privatechest;
 
-import org.bukkit.Material;
+import java.util.Set;
+
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace; // Importado
-import org.bukkit.block.BlockState; // Importado
-import org.bukkit.block.data.BlockData; // Importado
-import org.bukkit.block.data.type.Chest; // Importado
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-
-import java.util.HashSet; // Importado
-import java.util.Set; // Importado
 
 public class UnlockCommand implements CommandExecutor {
 
@@ -35,7 +29,7 @@ public class UnlockCommand implements CommandExecutor {
 
         Player player = (Player) sender;
 
-        if (!player.hasPermission("privatechest.use")) {
+        if (!player.hasPermission("privatechest.unlock")) {
             player.sendMessage(messages.raw("no_permission"));
             return true;
         }
@@ -46,15 +40,15 @@ public class UnlockCommand implements CommandExecutor {
         }
 
         String password = args[0];
-        Block targetBlock = player.getTargetBlock(null, 5); // Usamos getTargetBlock como en LockCommand
+        Block targetBlock = player.getTargetBlock(null, 5);
 
-        if (targetBlock == null || !isLockableContainer(targetBlock.getType())) {
+        if (targetBlock == null || !ContainerUtils.isLockableContainer(targetBlock.getType())) {
             player.sendMessage(messages.get("not_a_chest"));
             return true;
         }
 
-        // --- INICIO: Lógica de Cofre Doble ---
-        Set<Block> containerBlocks = getContainerBlocks(targetBlock);
+        // Get all blocks of the container (handles double chests)
+        Set<Block> containerBlocks = ContainerUtils.getContainerBlocks(targetBlock);
         Block lockedBlock = null;
 
         // Find if any part is locked
@@ -96,6 +90,7 @@ public class UnlockCommand implements CommandExecutor {
 
         return true;
     }
+<<<<<<< HEAD
 
     // --- Helper Methods (Copied or similar to other classes) ---
     private Set<Block> getContainerBlocks(Block block) {
@@ -152,4 +147,6 @@ public class UnlockCommand implements CommandExecutor {
         // Support all shulker box variants
         return type.name().contains("SHULKER_BOX");
     }
+=======
+>>>>>>> 22e8436 (Version 2.3.1)
 }

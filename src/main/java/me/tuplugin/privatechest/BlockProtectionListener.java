@@ -1,21 +1,15 @@
 package me.tuplugin.privatechest;
 
-import org.bukkit.Material;
+import java.util.Iterator;
+import java.util.Set;
+
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace; // Importado
-import org.bukkit.block.BlockState; // Importado
-import org.bukkit.block.data.BlockData; // Importado
-import org.bukkit.block.data.type.Chest; // Importado
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
-
-import java.util.HashSet; // Importado
-import java.util.Iterator;
-import java.util.Set; // Importado
 
 public class BlockProtectionListener implements Listener {
 
@@ -34,10 +28,10 @@ public class BlockProtectionListener implements Listener {
         Block blockBeingBroken = event.getBlock();
         Player player = event.getPlayer();
 
-        if (!isLockableContainer(blockBeingBroken.getType())) return;
+        if (!ContainerUtils.isLockableContainer(blockBeingBroken.getType())) return;
 
-        // --- INICIO: Lógica de Cofre Doble ---
-        Set<Block> containerBlocks = getContainerBlocks(blockBeingBroken);
+        // Get all blocks of the container (handles double chests)
+        Set<Block> containerBlocks = ContainerUtils.getContainerBlocks(blockBeingBroken);
         Block lockedBlock = null;
 
         // Find if any part of the container is locked
@@ -47,7 +41,6 @@ public class BlockProtectionListener implements Listener {
                 break;
             }
         }
-        // --- FIN: Lógica de Cofre Doble ---
 
         // If no part is locked, do nothing (allow break)
         if (lockedBlock == null) {
@@ -78,14 +71,14 @@ public class BlockProtectionListener implements Listener {
         }
     }
 
-    // --- Explosions Handlers (Unchanged, but be aware they might not be perfect for double chests) ---
+    // --- Explosion Handlers: protect both halves of double chests ---
     @EventHandler
     public void onEntityExplode(EntityExplodeEvent event) {
         Iterator<Block> it = event.blockList().iterator();
         while (it.hasNext()) {
             Block block = it.next();
-            if (isLockableContainer(block.getType()) && chestLocker.isChestLocked(block)) {
-                it.remove(); // Protects this specific block
+            if (ContainerUtils.isLockableContainer(block.getType()) && isAnyPartLocked(block)) {
+                it.remove();
             }
         }
     }
@@ -95,37 +88,23 @@ public class BlockProtectionListener implements Listener {
         Iterator<Block> it = event.blockList().iterator();
         while (it.hasNext()) {
             Block block = it.next();
-            if (isLockableContainer(block.getType()) && chestLocker.isChestLocked(block)) {
-                it.remove(); // Protects this specific block
+            if (ContainerUtils.isLockableContainer(block.getType()) && isAnyPartLocked(block)) {
+                it.remove();
             }
         }
     }
-    // --- End Explosions Handlers ---
 
-    // --- Helper Methods (Copied from ChestListener) ---
-    private Set<Block> getContainerBlocks(Block block) {
-        Set<Block> blocks = new HashSet<>();
-        blocks.add(block);
-
-        BlockState state = block.getState();
-        BlockData blockData = block.getBlockData();
-
-        if (state instanceof org.bukkit.block.Chest && blockData instanceof Chest) {
-            Chest chestData = (Chest) blockData;
-            Chest.Type chestType = chestData.getType();
-
-            if (chestType != Chest.Type.SINGLE) {
-                BlockFace facing = chestData.getFacing();
-                BlockFace otherHalfDirection = getOtherChestHalfDirection(chestType, facing);
-
-                if (otherHalfDirection != null) {
-                    Block otherBlock = block.getRelative(otherHalfDirection);
-                    if (otherBlock.getState() instanceof org.bukkit.block.Chest) {
-                        blocks.add(otherBlock);
-                    }
-                }
+    /**
+     * Checks if any part of a container (including the other half of a double chest) is locked.
+     */
+    private boolean isAnyPartLocked(Block block) {
+        Set<Block> parts = ContainerUtils.getContainerBlocks(block);
+        for (Block part : parts) {
+            if (chestLocker.isChestLocked(part)) {
+                return true;
             }
         }
+<<<<<<< HEAD
         return blocks;
     }
 
@@ -156,5 +135,8 @@ public class BlockProtectionListener implements Listener {
         }
         // Support all shulker box variants
         return type.name().contains("SHULKER_BOX");
+=======
+        return false;
+>>>>>>> 22e8436 (Version 2.3.1)
     }
 }

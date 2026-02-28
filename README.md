@@ -27,8 +27,14 @@ No complicated land-claim systems required — simple, secure, and optimized for
 
 | Command | Description | Permission |
 |:---|:---|:---|
-| `/lockchest <password>` | Lock the chest you are looking at. | `privatechest.use` |
-| `/unlockchest <password>` | Unlock your locked chest. | `privatechest.use` |
+| `/lockchest <password>` | Lock the chest you are looking at. | `privatechest.lock` |
+| `/unlockchest <password>` | Unlock your locked chest. | `privatechest.unlock` |
+| `/trust <player>` | Give another player access to your locked containers. | `privatechest.trust` |
+| `/trust list` | List all players you have trusted. | `privatechest.trust` |
+| `/untrust <player>` | Remove access from a player. | `privatechest.untrust` |
+| `/untrust all` | Remove access from all trusted players. | `privatechest.untrust` |
+| `/renamecontainer <name>` | Set a custom name for a protected container. | `privatechest.rename` |
+| `/renamecontainer remove` | Remove the custom name from a container. | `privatechest.rename` |
 | `/privatechest reload` | Reload config and messages without restart. | `privatechest.admin` |
 | `/clearchests` | Remove orphaned chest entries from data.yml. | `privatechest.admin` |
 
@@ -36,8 +42,17 @@ No complicated land-claim systems required — simple, secure, and optimized for
 
 ## 🔒 Permissions
 
-- `privatechest.use` → Allows players to lock and unlock chests.
-- `privatechest.admin` → Allows access to administrative commands.
+| Permission | Description | Default |
+|:---|:---|:---|
+| `privatechest.use` | Parent permission — grants all player commands below. | `true` |
+| `privatechest.lock` | Allows using `/lockchest`. | `true` |
+| `privatechest.unlock` | Allows using `/unlockchest`. | `true` |
+| `privatechest.trust` | Allows using `/trust`. | `true` |
+| `privatechest.untrust` | Allows using `/untrust`. | `true` |
+| `privatechest.rename` | Allows using `/renamecontainer`. | `true` |
+| `privatechest.admin` | Admin commands and bypass protection. | `op` |
+
+> **Tip:** To block a single command (e.g. `/lockchest`) for a player or group, simply negate `privatechest.lock` in your permissions plugin. The rest of the commands will continue working normally.
 
 ---
 

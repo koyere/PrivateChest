@@ -1,6 +1,5 @@
 package me.tuplugin.privatechest;
 
-import me.tuplugin.privatechest.enums.ContainerType;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
@@ -8,6 +7,8 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.util.RayTraceResult;
+
+import me.tuplugin.privatechest.enums.ContainerType;
 
 /**
  * Command executor for the /renamecontainer command.
@@ -47,7 +48,7 @@ public class RenameCommand implements CommandExecutor {
         Player player = (Player) sender;
 
         // Check permission
-        if (!player.hasPermission("privatechest.use")) {
+        if (!player.hasPermission("privatechest.rename")) {
             player.sendMessage(messageManager.raw("no_permission"));
             return true;
         }

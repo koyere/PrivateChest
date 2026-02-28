@@ -1,9 +1,13 @@
 package me.tuplugin.privatechest;
 
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-
-import java.util.*;
 
 /**
  * Manages trust relationships between players.
@@ -11,8 +15,8 @@ import java.util.*;
  */
 public class TrustManager {
 
-    // Map: Owner UUID -> Set of trusted player UUIDs
-    private final Map<String, Set<String>> trustRelations = new HashMap<>();
+    // Thread-safe map: Owner UUID -> Set of trusted player UUIDs
+    private final Map<String, Set<String>> trustRelations = new ConcurrentHashMap<>();
 
     private static TrustManager instance;
     private final PrivateChest plugin;
@@ -39,7 +43,7 @@ public class TrustManager {
         String ownerUUID = owner.getUniqueId().toString();
         String trustedUUID = trusted.getUniqueId().toString();
 
-        trustRelations.computeIfAbsent(ownerUUID, k -> new HashSet<>());
+        trustRelations.computeIfAbsent(ownerUUID, k -> ConcurrentHashMap.newKeySet());
         return trustRelations.get(ownerUUID).add(trustedUUID);
     }
 
@@ -50,7 +54,7 @@ public class TrustManager {
         if (ownerUUID == null || trustedUUID == null) return false;
         if (ownerUUID.equals(trustedUUID)) return false;
 
-        trustRelations.computeIfAbsent(ownerUUID, k -> new HashSet<>());
+        trustRelations.computeIfAbsent(ownerUUID, k -> ConcurrentHashMap.newKeySet());
         return trustRelations.get(ownerUUID).add(trustedUUID);
     }
 

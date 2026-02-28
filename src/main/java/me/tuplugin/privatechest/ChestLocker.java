@@ -1,21 +1,19 @@
 package me.tuplugin.privatechest;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 
-import java.util.HashMap;
-import java.util.Map;
-
 public class ChestLocker {
 
-    // Stores protected chests: location -> owner UUID
-    private final Map<Location, String> chestOwners = new HashMap<>();
-
-    // Stores passwords: location -> hashed password
-    private final Map<Location, String> chestPasswords = new HashMap<>();
+    // Thread-safe maps for concurrent access from listeners, commands, and async cleanup
+    private final Map<Location, String> chestOwners = new ConcurrentHashMap<>();
+    private final Map<Location, String> chestPasswords = new ConcurrentHashMap<>();
 
     private static ChestLocker instance;
     private final PrivateChest plugin;
@@ -46,9 +44,14 @@ public class ChestLocker {
         // Hash the password before storing
         String hashedPassword = PasswordManager.hashPassword(password);
         if (hashedPassword == null) {
+<<<<<<< HEAD
             // Hashing failed, log error and return false for security
             plugin.getLogger().warning("Failed to hash password for chest at " + serializeLocation(loc) + ". Lock operation aborted.");
             return false;
+=======
+            plugin.getLogger().warning("Failed to hash password for chest at " + serializeLocation(loc) + ". Using plain text as fallback.");
+            hashedPassword = password;
+>>>>>>> 22e8436 (Version 2.3.1)
         }
 
         chestOwners.put(loc, player.getUniqueId().toString());
@@ -74,16 +77,13 @@ public class ChestLocker {
 
         // Check if stored password is in plain text (legacy format)
         if (PasswordManager.isPlainText(storedPassword)) {
-            // Legacy plain text comparison
             boolean isCorrect = storedPassword.equals(password);
 
             if (isCorrect) {
-                // Migrate to hashed format
                 String hashedPassword = PasswordManager.migratePlainPassword(password);
                 if (hashedPassword != null) {
                     chestPasswords.put(loc, hashedPassword);
                     plugin.getLogger().info("Migrated plain text password to hashed format for chest at " + serializeLocation(loc));
-                    // Save the migration immediately
                     plugin.getDataManager().saveData();
                 } else {
                     plugin.getLogger().warning("Failed to migrate password for chest at " + serializeLocation(loc));
@@ -92,7 +92,6 @@ public class ChestLocker {
 
             return isCorrect;
         } else {
-            // Use secure hash verification
             return PasswordManager.verifyPassword(password, storedPassword);
         }
     }
@@ -114,15 +113,13 @@ public class ChestLocker {
 
     /**
      * Gets the owner UUID of a chest.
-     * @param block The chest block.
-     * @return The owner's UUID as string, or null if not locked.
      */
     public String getOwnerUUID(Block block) {
         return chestOwners.get(block.getLocation());
     }
 
     /**
-     * Removes protection from a chest (used after successful unlock or removal).
+     * Removes protection from a chest.
      */
     public void removeProtection(Block block) {
         Location loc = block.getLocation();
@@ -130,9 +127,6 @@ public class ChestLocker {
         chestPasswords.remove(loc);
     }
 
-    /**
-     * Gets all protected chests.
-     */
     public Map<Location, String> getChestOwners() {
         return chestOwners;
     }
@@ -143,7 +137,7 @@ public class ChestLocker {
 
     /**
      * Migrates all plain text passwords to hashed format.
-     * Called during plugin startup or reload.
+     * Called during plugin startup.
      */
     public void migrateAllPasswords() {
         int migrated = 0;
@@ -171,14 +165,16 @@ public class ChestLocker {
     }
 
     /**
-     * Serializes a Location to a String (world:x:y:z)
+     * Serializes a Location to a String (world:x:y:z).
+     * Null-safe: returns "unknown" if location or world is null.
      */
     public static String serializeLocation(Location loc) {
-        return loc.getWorld().getName() + ":" + loc.getBlockX() + ":" + loc.getBlockY() + ":" + loc.getBlockZ();
+        String result = ContainerUtils.serializeLocation(loc);
+        return result != null ? result : "unknown";
     }
 
     /**
-     * Deserializes a String to a Location (world:x:y:z)
+     * Deserializes a String to a Location (world:x:y:z).
      */
     public static Location deserializeLocation(String serialized) {
         String[] parts = serialized.split(":");

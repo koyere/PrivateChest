@@ -1,19 +1,12 @@
 package me.tuplugin.privatechest;
 
-import org.bukkit.Material;
+import java.util.Set;
+
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace; // Importado
-import org.bukkit.block.BlockState;
-import org.bukkit.block.data.BlockData; // Importado
-import org.bukkit.block.data.type.Chest; // Importado - ¡CRUCIAL QUE ESTO SE RESUELVA!
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-// Se elimina la importación de org.bukkit.inventory.DoubleChest
-
-import java.util.HashSet;
-import java.util.Set;
 
 public class LockCommand implements CommandExecutor {
 
@@ -38,7 +31,7 @@ public class LockCommand implements CommandExecutor {
 
         Player player = (Player) sender;
 
-        if (!player.hasPermission("privatechest.use")) {
+        if (!player.hasPermission("privatechest.lock")) {
             player.sendMessage(messages.raw("no_permission"));
             return true;
         }
@@ -51,51 +44,17 @@ public class LockCommand implements CommandExecutor {
         String password = args[0];
         Block targetBlock = player.getTargetBlock(null, 5);
 
-        if (targetBlock == null || !isLockableContainer(targetBlock.getType())) {
+        if (targetBlock == null || !ContainerUtils.isLockableContainer(targetBlock.getType())) {
             player.sendMessage(messages.get("not_a_chest"));
             return true;
         }
 
-        Set<Block> blocksToLock = new HashSet<>();
-        BlockState state = targetBlock.getState();
+        Set<Block> blocksToLock = ContainerUtils.getContainerBlocks(targetBlock);
 
-        // --- INICIO: Lógica alternativa para Cofres Dobles usando BlockData ---
-        if (state instanceof org.bukkit.block.Chest) { // Check if it's a Bukkit Chest state
-            BlockData blockData = targetBlock.getBlockData();
-            // Check if it has Chest BlockData (requires Spigot 1.13+)
-            if (blockData instanceof Chest) {
-                Chest chestData = (Chest) blockData;
-                Chest.Type chestType = chestData.getType();
-
-                if (chestType == Chest.Type.SINGLE) {
-                    // It's a single chest or a barrel treated as single.
-                    blocksToLock.add(targetBlock);
-                } else {
-                    // It's LEFT or RIGHT, meaning it's part of a double chest.
-                    blocksToLock.add(targetBlock); // Add the targeted half.
-                    BlockFace facing = chestData.getFacing();
-                    BlockFace otherHalfDirection = getOtherChestHalfDirection(chestType, facing);
-
-                    if (otherHalfDirection != null) {
-                        Block otherBlock = targetBlock.getRelative(otherHalfDirection);
-                        // Verify the other block is also a chest before adding.
-                        if (otherBlock.getState() instanceof org.bukkit.block.Chest) {
-                            blocksToLock.add(otherBlock);
-                        }
-                    }
-                }
-            } else {
-                // Fallback for older versions or unexpected data: treat as single.
-                blocksToLock.add(targetBlock);
-            }
-        } else if (targetBlock.getType() == Material.BARREL) {
-            // It's a barrel, always single.
-            blocksToLock.add(targetBlock);
-        } else {
+        if (blocksToLock.isEmpty()) {
             player.sendMessage(messages.get("not_a_chest"));
             return true;
         }
-        // --- FIN: Lógica alternativa ---
 
         // Check if any part is already locked
         for (Block block : blocksToLock) {
@@ -155,6 +114,7 @@ public class LockCommand implements CommandExecutor {
 
         return true;
     }
+<<<<<<< HEAD
 
     /**
      * Determines the direction of the other half of a double chest.
@@ -190,4 +150,6 @@ public class LockCommand implements CommandExecutor {
         // Support all shulker box variants
         return type.name().contains("SHULKER_BOX");
     }
+=======
+>>>>>>> 22e8436 (Version 2.3.1)
 }

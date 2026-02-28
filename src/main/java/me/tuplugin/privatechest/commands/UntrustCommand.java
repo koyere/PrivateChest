@@ -1,15 +1,16 @@
 package me.tuplugin.privatechest.commands;
 
-import me.tuplugin.privatechest.MessageManager;
-import me.tuplugin.privatechest.PrivateChest;
-import me.tuplugin.privatechest.TrustManager;
+import java.util.Set;
+
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-import java.util.Set;
+import me.tuplugin.privatechest.MessageManager;
+import me.tuplugin.privatechest.PrivateChest;
+import me.tuplugin.privatechest.TrustManager;
 
 public class UntrustCommand implements CommandExecutor {
 
@@ -32,7 +33,7 @@ public class UntrustCommand implements CommandExecutor {
 
         Player player = (Player) sender;
 
-        if (!player.hasPermission("privatechest.use")) {
+        if (!player.hasPermission("privatechest.untrust")) {
             player.sendMessage(messages.raw("no_permission"));
             return true;
         }
