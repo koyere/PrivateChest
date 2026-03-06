@@ -44,14 +44,8 @@ public class ChestLocker {
         // Hash the password before storing
         String hashedPassword = PasswordManager.hashPassword(password);
         if (hashedPassword == null) {
-<<<<<<< HEAD
-            // Hashing failed, log error and return false for security
             plugin.getLogger().warning("Failed to hash password for chest at " + serializeLocation(loc) + ". Lock operation aborted.");
             return false;
-=======
-            plugin.getLogger().warning("Failed to hash password for chest at " + serializeLocation(loc) + ". Using plain text as fallback.");
-            hashedPassword = password;
->>>>>>> 22e8436 (Version 2.3.1)
         }
 
         chestOwners.put(loc, player.getUniqueId().toString());

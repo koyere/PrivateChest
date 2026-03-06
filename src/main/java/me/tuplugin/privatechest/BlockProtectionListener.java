@@ -104,39 +104,6 @@ public class BlockProtectionListener implements Listener {
                 return true;
             }
         }
-<<<<<<< HEAD
-        return blocks;
-    }
-
-    private BlockFace getOtherChestHalfDirection(Chest.Type type, BlockFace facing) {
-        if (type == Chest.Type.LEFT) {
-            switch (facing) {
-                case NORTH: return BlockFace.EAST;
-                case EAST:  return BlockFace.SOUTH;
-                case SOUTH: return BlockFace.WEST;
-                case WEST:  return BlockFace.NORTH;
-                default:    return null;
-            }
-        } else if (type == Chest.Type.RIGHT) {
-            switch (facing) {
-                case NORTH: return BlockFace.WEST;
-                case EAST:  return BlockFace.NORTH;
-                case SOUTH: return BlockFace.EAST;
-                case WEST:  return BlockFace.SOUTH;
-                default:    return null;
-            }
-        }
-        return null;
-    }
-
-    private boolean isLockableContainer(Material type) {
-        if (type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL) {
-            return true;
-        }
-        // Support all shulker box variants
-        return type.name().contains("SHULKER_BOX");
-=======
         return false;
->>>>>>> 22e8436 (Version 2.3.1)
     }
 }

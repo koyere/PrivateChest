@@ -1,13 +1,13 @@
 package me.tuplugin.privatechest;
 
+import java.util.Set;
+
 import org.bukkit.block.Block;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEvent;
-
-import java.util.Set;
 
 public class ChestListener implements Listener {
 
@@ -89,78 +89,4 @@ public class ChestListener implements Listener {
         event.setCancelled(true);
         player.sendMessage(messages.get("not_your_chest"));
     }
-<<<<<<< HEAD
-
-    /**
-     * Gets all blocks belonging to a container (1 for single, 2 for double).
-     * Uses BlockData approach.
-     * @param block One block of the container.
-     * @return A Set containing all blocks of the container.
-     */
-    private Set<Block> getContainerBlocks(Block block) {
-        Set<Block> blocks = new HashSet<>();
-        blocks.add(block); // Always add the clicked block
-
-        BlockState state = block.getState();
-        BlockData blockData = block.getBlockData();
-
-        // Check if it's a Chest and has Chest BlockData
-        if (state instanceof org.bukkit.block.Chest && blockData instanceof Chest) {
-            Chest chestData = (Chest) blockData;
-            Chest.Type chestType = chestData.getType();
-
-            // If it's LEFT or RIGHT, find the other half
-            if (chestType != Chest.Type.SINGLE) {
-                BlockFace facing = chestData.getFacing();
-                BlockFace otherHalfDirection = getOtherChestHalfDirection(chestType, facing);
-
-                if (otherHalfDirection != null) {
-                    Block otherBlock = block.getRelative(otherHalfDirection);
-                    // Add the other half if it's also a Chest
-                    if (otherBlock.getState() instanceof org.bukkit.block.Chest) {
-                        blocks.add(otherBlock);
-                    }
-                }
-            }
-        }
-        return blocks;
-    }
-
-    /**
-     * Helper method to determine the direction of the other half of a double chest.
-     * (Identical to the one in LockCommand)
-     */
-    private BlockFace getOtherChestHalfDirection(Chest.Type type, BlockFace facing) {
-        if (type == Chest.Type.LEFT) {
-            switch (facing) {
-                case NORTH: return BlockFace.EAST;
-                case EAST:  return BlockFace.SOUTH;
-                case SOUTH: return BlockFace.WEST;
-                case WEST:  return BlockFace.NORTH;
-                default:    return null;
-            }
-        } else if (type == Chest.Type.RIGHT) {
-            switch (facing) {
-                case NORTH: return BlockFace.WEST;
-                case EAST:  return BlockFace.NORTH;
-                case SOUTH: return BlockFace.EAST;
-                case WEST:  return BlockFace.SOUTH;
-                default:    return null;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Checks if a material type is a lockable container.
-     */
-    private boolean isLockableContainer(Material type) {
-        if (type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL) {
-            return true;
-        }
-        // Support all shulker box variants
-        return type.name().contains("SHULKER_BOX");
-    }
-=======
->>>>>>> 22e8436 (Version 2.3.1)
 }

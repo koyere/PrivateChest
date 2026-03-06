@@ -50,9 +50,10 @@ No complicated land-claim systems required — simple, secure, and optimized for
 | `privatechest.trust` | Allows using `/trust`. | `true` |
 | `privatechest.untrust` | Allows using `/untrust`. | `true` |
 | `privatechest.rename` | Allows using `/renamecontainer`. | `true` |
+| `privatechest.sign` | Allows locking containers via `[Private]` signs. | `true` |
 | `privatechest.admin` | Admin commands and bypass protection. | `op` |
 
-> **Tip:** To block a single command (e.g. `/lockchest`) for a player or group, simply negate `privatechest.lock` in your permissions plugin. The rest of the commands will continue working normally.
+> **Tip:** To block only the `/lockchest` command while keeping sign-based protection, negate `privatechest.lock` in your permissions plugin. Signs use `privatechest.sign` independently.
 
 ---
 

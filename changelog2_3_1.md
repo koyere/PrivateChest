@@ -14,8 +14,10 @@
     - `privatechest.trust` — Controls access to `/trust`
     - `privatechest.untrust` — Controls access to `/untrust`
     - `privatechest.rename` — Controls access to `/renamecontainer`
+    - `privatechest.sign` — Controls access to `[Private]` sign-based locking
   - `privatechest.use` now acts as a **parent permission** that grants all of the above
   - Server admins can now deny specific commands per player or group without affecting the rest
+  - Sign protection (`privatechest.sign`) is independent from the command (`privatechest.lock`), so blocking `/lockchest` does not block `[Private]` signs
 
 - **Shared Container Utility Class (`ContainerUtils`)**
   - Centralized double chest detection, container validation, and location serialization
@@ -27,8 +29,9 @@
   - Previously, if only one half of a double chest had the lock record, the other half could be destroyed by TNT/creepers
   - Both `EntityExplodeEvent` and `BlockExplodeEvent` now check all container parts
 
-- **Sign protection now uses granular permission (`privatechest.lock`)**
-  - Previously used `privatechest.use`, inconsistent with the new granular system
+- **Sign protection now uses its own permission (`privatechest.sign`)**
+  - Previously shared permission with `/lockchest`, meaning blocking the command also blocked `[Private]` signs
+  - Now uses a dedicated `privatechest.sign` permission, independent from `privatechest.lock`
 
 - **Null safety in `ChestLocker.serializeLocation()`**
   - Previously could throw `NullPointerException` if a world was unloaded
@@ -52,7 +55,7 @@
 - By default, nothing changes for existing servers. `privatechest.use` still grants all commands.
 - To block a specific command, negate its permission in your permissions plugin:
   ```yaml
-  # LuckPerms example — block only /lockchest for a group
+  # LuckPerms example — block only /lockchest but keep [Private] signs working
   permissions:
     - privatechest.lock: false
   ```

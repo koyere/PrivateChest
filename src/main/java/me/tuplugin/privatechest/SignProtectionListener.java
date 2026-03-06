@@ -1,5 +1,8 @@
 package me.tuplugin.privatechest;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -9,11 +12,8 @@ import org.bukkit.block.data.type.WallSign;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.block.BlockBreakEvent;
-
-import java.util.HashSet;
-import java.util.Set;
+import org.bukkit.event.block.SignChangeEvent;
 
 /**
  * Handles sign-based chest protection.
@@ -52,8 +52,8 @@ public class SignProtectionListener implements Listener {
             return;
         }
 
-        // Check permission - sign protection is equivalent to locking
-        if (!player.hasPermission("privatechest.lock")) {
+        // Check permission - sign protection has its own permission, separate from /lockchest
+        if (!player.hasPermission("privatechest.sign")) {
             player.sendMessage(messages.raw("no_permission"));
             event.setCancelled(true);
             return;
@@ -294,18 +294,4 @@ public class SignProtectionListener implements Listener {
     private boolean isSign(Material material) {
         return material.name().contains("SIGN");
     }
-<<<<<<< HEAD
-
-    /**
-     * Checks if a material is a lockable container.
-     */
-    private boolean isLockableContainer(Material type) {
-        if (type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL) {
-            return true;
-        }
-        // Support all shulker box variants
-        return type.name().contains("SHULKER_BOX");
-    }
-=======
->>>>>>> 22e8436 (Version 2.3.1)
 }

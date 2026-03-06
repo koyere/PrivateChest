@@ -114,42 +114,4 @@ public class LockCommand implements CommandExecutor {
 
         return true;
     }
-<<<<<<< HEAD
-
-    /**
-     * Determines the direction of the other half of a double chest.
-     * @param type The type (LEFT or RIGHT).
-     * @param facing The direction the chest is facing.
-     * @return The BlockFace direction to the other half, or null if single/error.
-     */
-    private BlockFace getOtherChestHalfDirection(Chest.Type type, BlockFace facing) {
-        if (type == Chest.Type.LEFT) {
-            switch (facing) {
-                case NORTH: return BlockFace.EAST;
-                case EAST:  return BlockFace.SOUTH;
-                case SOUTH: return BlockFace.WEST;
-                case WEST:  return BlockFace.NORTH;
-                default:    return null; // Should not happen for chests
-            }
-        } else if (type == Chest.Type.RIGHT) {
-            switch (facing) {
-                case NORTH: return BlockFace.WEST;
-                case EAST:  return BlockFace.NORTH;
-                case SOUTH: return BlockFace.EAST;
-                case WEST:  return BlockFace.SOUTH;
-                default:    return null; // Should not happen for chests
-            }
-        }
-        return null; // Not a double chest part
-    }
-
-    private boolean isLockableContainer(Material type) {
-        if (type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL) {
-            return true;
-        }
-        // Support all shulker box variants
-        return type.name().contains("SHULKER_BOX");
-    }
-=======
->>>>>>> 22e8436 (Version 2.3.1)
 }

@@ -1,10 +1,6 @@
 # Main plugin definition
 name: PrivateChest
-<<<<<<< HEAD
-version: '2.3'
-=======
 version: 2.3.1
->>>>>>> 22e8436 (Version 2.3.1)
 main: me.tuplugin.privatechest.PrivateChest
 # Minimum Spigot/Paper API version required (1.16 ensures modern methods)
 api-version: '1.16'
@@ -53,7 +49,7 @@ commands:
 # Permission definitions
 permissions:
   privatechest.use:
-    description: Grants all player commands (/lockchest, /unlockchest, /trust, /untrust, /renamecontainer). Acts as a parent permission.
+    description: Grants all player commands and sign protection. Acts as a parent permission.
     default: true
     children:
       privatechest.lock: true
@@ -61,6 +57,7 @@ permissions:
       privatechest.trust: true
       privatechest.untrust: true
       privatechest.rename: true
+      privatechest.sign: true
 
   # --- Granular Command Permissions (v2.3.1+) ---
   # These allow fine-grained control over individual commands.
@@ -85,6 +82,10 @@ permissions:
 
   privatechest.rename:
     description: Allows using /renamecontainer to name protected containers.
+    default: true
+
+  privatechest.sign:
+    description: Allows locking containers via [Private] signs.
     default: true
 
   privatechest.admin:
