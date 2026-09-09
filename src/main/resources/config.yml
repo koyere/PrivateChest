@@ -47,6 +47,57 @@ use-prefix: true
 # Default: "&7[&6PrivateChest&7] "
 prefix: "&7[&6PrivateChest&7] "
 
+# --- Language ---
+
+# Which bundled translation to use.
+#
+# Translations live in plugins/PrivateChest/lang/. On first start, the one named here is copied to
+# messages.yml, which becomes your active, editable file. Changing this later does not overwrite
+# messages.yml; delete that file if you want it recreated in another language.
+#
+# Bundled: en, es
+# To add your own: copy a file in lang/ to lang/<code>.yml and translate the values.
+# Default: en
+language: en
+
+# Serve each player messages in their own client language.
+#
+# When on, every lang/<code>.yml file is loaded and each player is matched to one by their Minecraft
+# language setting. Anything a translation is missing falls back to messages.yml.
+# When off, everyone gets messages.yml.
+# Default: false
+use-player-locale: false
+
+# --- Container Names ---
+
+# Rules for the names players can give containers with /renamecontainer.
+container-names:
+  # Shortest and longest allowed name.
+  # Default: 1 and 16
+  min-length: 1
+  max-length: 16
+
+  # Which characters are allowed, as a regular expression.
+  #
+  # The default accepts letters and digits in any language, plus spaces, hyphens and underscores.
+  # \p{L} is "any letter" and \p{N} is "any digit", so accented and non-Latin characters work.
+  # Default: "^[\\p{L}\\p{N}_\\-\\s]+$"
+  pattern: "^[\\p{L}\\p{N}_\\-\\s]+$"
+
+  # Names that are not allowed, whatever the pattern says. Case is ignored.
+  # Add the equivalents in your own language: a player naming a container "admin" or "server" is
+  # usually trying to mislead someone.
+  forbidden:
+    - "null"
+    - "undefined"
+    - "admin"
+    - "console"
+    - "system"
+    - "server"
+    - "privatechest"
+    - "staff"
+    - "owner"
+
 # --- Protectable Containers ---
 
 # Which blocks players are allowed to protect.
@@ -94,18 +145,21 @@ containers:
 
 # --- Feature Settings ---
 
-# Enable sign-based protection. Players can lock chests by placing
-# a sign with [Private] on the first line near the chest.
+# Enable sign-based protection: writing the private tag on a sign next to a container locks it.
+#
+# The tag itself is part of the translation, not a fixed word. It lives in messages.yml under
+# 'sign_tag', with 'sign_tag_aliases' for other accepted spellings, so a Spanish server can use
+# [Privado] instead of [Private].
 # Default: true
 enable-sign-protection: true
 
-# Enable chest locking limits based on player permissions.
-# When enabled, players will have a maximum number of chests they can lock.
+# Enable container limits based on player permissions.
+# When on, players can only lock a maximum number of containers.
 # Default: false
 enable-chest-limits: false
 
-# Default number of chests a player can lock if they don't have specific permissions.
-# Only used when enable-chest-limits is true.
+# How many containers a player can lock when they have no limit permission.
+# Only used when enable-chest-limits is true. A limit permission always overrides this.
 # Default: 5
 default-chest-limit: 5
 
@@ -263,7 +317,11 @@ auto-cleanup:
 #
 # When disabled (default), hoppers CANNOT:
 # - Move items to or from ANY locked container
-# - Be placed within 1 block of locked containers (prevented automatically)
+# - Be picked up into one by a hopper or hopper minecart
+# - Be placed next to a container the placing player has no access to
+#
+# Players can still place hoppers next to containers they own or are trusted on, so their own
+# sorting systems keep working. 2.x refused next to any locked container, including your own.
 #
 # Default: false (maximum security - blocks all hopper access)
 hopper-protection:

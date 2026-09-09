@@ -96,8 +96,8 @@ public class HopperProtectionListener implements Listener {
 
         if (findInaccessibleContainerNearby(placedBlock, player) != null) {
             event.setCancelled(true);
-            messages.send(player, messages.get("automated_block_placement_denied")
-                    .replace("{block}", getBlockDisplayName(placedType)));
+            messages.send(player, "automated_block_placement_denied",
+                    "block", getBlockDisplayName(placedType));
         }
     }
 

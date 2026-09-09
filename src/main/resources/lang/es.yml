@@ -1,0 +1,196 @@
+# -------------------------------------------------- #
+#           PrivateChest Mensajes - Español           #
+# -------------------------------------------------- #
+#
+# Este archivo puede estar en dos sitios, y en cada uno se comporta de forma distinta:
+#
+#   messages.yml   Tu archivo activo. Es el que lee el plugin y el que editas tú.
+#                  Se creó a partir del idioma indicado en config.yml. Nada sobrescribe tus textos;
+#                  las actualizaciones solo añaden las claves que todavía no existían.
+#
+#   lang/es.yml    Una plantilla de solo lectura. Se usa para crear messages.yml la primera vez, para
+#                  aportar las claves nuevas en el idioma correcto tras una actualización, y para
+#                  servir este idioma directamente a los jugadores si activas 'use-player-locale'.
+#
+# Para añadir un idioma, copia este archivo a lang/<código>.yml y traduce los valores. Después pon el
+# código en 'language' dentro de config.yml, o activa 'use-player-locale' para que cada jugador
+# reciba el suyo.
+#
+# Usa códigos de color con &. Los marcadores entre {llaves} los rellena el plugin.
+#
+
+# --- Errores generales y permisos ---
+
+no_permission: "&cNo tienes permiso para usar este comando."
+console_only_player: "&cEste comando solo puede usarlo un jugador."
+not_a_chest: "&cTienes que estar mirando un contenedor para usar este comando."
+not_locked: "&eEste contenedor no está protegido."
+# Admite {container} y {owner}.
+not_your_chest: "&cEste {container} es de {owner}."
+error_generic: "&cHa ocurrido un error inesperado. Avisa a un administrador."
+unknown_player: "Desconocido"
+
+# --- /lockchest ---
+
+usage_lock: "&cUso: /lockchest <contraseña>"
+# {container} es el nombre del tipo de contenedor.
+locked: "&aEste {container} queda protegido."
+already_locked: "&eEste contenedor ya está protegido."
+
+# --- /unlockchest ---
+
+usage_unlock: "&cUso: /unlockchest <contraseña>"
+unlocked: "&aProtección retirada."
+wrong_password: "&cContraseña incorrecta. Acceso denegado."
+# Los límites se configuran en la sección 'security' de config.yml.
+too_many_attempts: "&cDemasiadas contraseñas incorrectas. Vuelve a intentarlo en {seconds} segundo(s)."
+
+# --- /trust y /untrust ---
+
+usage_trust: "&cUso: /trust <jugador> o /trust list"
+usage_untrust: "&cUso: /untrust <jugador> o /untrust all"
+player_not_found: "&cEl jugador '{player}' no está conectado."
+cannot_trust_yourself: "&cNo puedes darte acceso a ti mismo."
+player_trusted: "&aHas dado acceso a &e{player}&a. Ya puede usar tus contenedores protegidos."
+trusted_by_player: "&a&l{player} &ate ha dado acceso a sus contenedores protegidos."
+player_already_trusted: "&e{player} ya tiene acceso."
+player_untrusted: "&cHas quitado el acceso a &e{player}&c. Ya no puede usar tus contenedores protegidos."
+untrusted_by_player: "&c&l{player} &cte ha quitado el acceso a sus contenedores protegidos."
+player_not_trusted: "&e{player} no está en tu lista de acceso."
+no_trusted_players: "&eTodavía no has dado acceso a nadie."
+all_players_untrusted: "&cAcceso retirado a {count} jugador(es)."
+untrust_all_failed: "&cNo se ha podido retirar el acceso a esos jugadores."
+
+# --- Lista de acceso ---
+
+trusted_players_header: "&6=== &eJugadores con acceso &6==="
+trusted_player_entry: "&7- &e{player} &7({status})"
+trusted_players_footer: "&6=== &eTotal: {count} &6==="
+player_status_online: "&aconectado"
+player_status_offline: "&7desconectado"
+
+# --- Límites de contenedores ---
+#
+# {container} es el nombre del tipo de contenedor, por ejemplo "caja de shulker". Solo tiene sentido
+# con los límites por familia activados (container-limits.enabled en config.yml); con el límite global
+# se sustituye por una palabra genérica.
+
+limit_exceeded: "&cNo puedes proteger más contenedores. Llevas {current}/{limit} y quieres proteger {trying} más."
+limit_exceeded_type: "&cNo puedes proteger más contenedores de ese tipo. Llevas {current}/{limit} {container} y quieres proteger {trying} más."
+sign_limit_exceeded: "&cEste cartel te pasaría del límite. Llevas {current}/{limit} y protegería {trying} más."
+sign_limit_exceeded_type: "&cEste cartel te pasaría del límite para ese tipo de contenedor. Llevas {current}/{limit} {container} y protegería {trying} más."
+limit_warning: "&eTe quedan {remaining} de {limit} protecciones."
+limit_reached: "&cHas alcanzado tu límite de {limit}."
+limit_status: "&7Protecciones usadas: {status}"
+limit_unlimited: "Sin límite"
+
+# --- Protección con carteles ---
+#
+# La etiqueta es el texto que un jugador escribe en un cartel para proteger el contenedor de al lado.
+# Puedes traducirla libremente. La comparación ignora mayúsculas, códigos de color y espacios.
+
+# La etiqueta de este idioma.
+sign_tag: "[Privado]"
+# Otras formas también aceptadas, para poder cambiar de idioma sin romper los carteles existentes.
+sign_tag_aliases:
+  - "[Privado]"
+  - "[Private]"
+# En qué se convierte la primera línea cuando el contenedor queda protegido.
+sign_tag_locked: "&4[&cPrivado&4]"
+
+sign_no_chest_found: "&cNo hay ningún contenedor junto a este cartel. Colócalo sobre uno o a su lado."
+sign_chest_already_locked: "&cEste contenedor ya está protegido."
+# {container} es el nombre del tipo de contenedor.
+sign_chest_locked: "&aEste {container} queda protegido con un cartel privado."
+sign_lock_failed: "&cNo se ha podido proteger el contenedor con este cartel."
+sign_cannot_break: "&cNo puedes romper este cartel privado."
+sign_chest_unlocked: "&aProtección retirada al quitar el cartel privado."
+admin_sign_break_notice: "&e(Admin) Has roto un cartel privado y retirado la protección."
+
+# --- /clearchests ---
+
+cleaning_start: "&eBuscando registros de contenedores huérfanos..."
+cleaned_chests: "&a\u2714 Eliminados {amount} registro(s) huérfano(s)."
+no_chests_to_clean: "&aNo hay registros huérfanos."
+# Los registros en chunks sin cargar se dejan intactos a propósito: un chunk sin cargar no demuestra
+# que el contenedor ya no exista.
+clean_skipped_unloaded: "&7{amount} registro(s) omitido(s) porque sus chunks no están cargados."
+cleanup_already_running: "&eYa hay una limpieza en curso. Inténtalo en un momento."
+
+# --- /privatechest ---
+
+usage_privatechest: "&eUso: /privatechest <reload|status|save|migrate>"
+reload_success: "&a\u2714 Configuración y mensajes recargados."
+
+# --- /privatechest status ---
+
+status_header: "&6=== &eEstado de PrivateChest &6==="
+status_storage: "&7Almacenamiento: &f{type}"
+status_containers: "&7Contenedores protegidos: &f{amount}"
+status_trust: "&7Relaciones de acceso: &f{amount}"
+status_container_types: "&7Tipos de contenedor protegibles: &f{amount}"
+status_pending: "&7Cambios sin guardar: &f{state}"
+status_pending_yes: "&esí"
+status_pending_no: "&aninguno"
+
+# --- /privatechest save ---
+
+save_success: "&a\u2714 Todos los cambios pendientes se han escrito en disco."
+save_failed: "&cNo se han podido escribir los cambios pendientes. Mira la consola."
+
+# --- /privatechest migrate ---
+
+usage_migrate: "&eUso: /privatechest migrate <yaml|sqlite>"
+migrate_started: "&eMigrando el almacenamiento a {type}. Puede tardar un momento..."
+migrate_success: "&a\u2714 Almacenamiento migrado a {type}. Los archivos anteriores se conservan como respaldo."
+migrate_already_active: "&e{type} ya es el almacenamiento activo."
+migrate_failed: "&cLa migración ha fallado. El almacenamiento actual no ha cambiado. Mira la consola."
+
+# --- Protección contra bloques automáticos ---
+
+automated_block_placement_denied: "&cNo puedes colocar {block} junto a un contenedor al que no tienes acceso."
+
+# Nombres usados para {block} arriba.
+block_name_hopper: "una tolva"
+block_name_dropper: "un dropper"
+block_name_dispenser: "un dispensador"
+
+# --- /renamecontainer ---
+
+usage_rename_container: "&eUso: /renamecontainer <nombre> o /renamecontainer remove"
+container_name_set: "&aContenedor renombrado a '&f{name}&a'."
+container_name_removed: "&aNombre personalizado quitado del {container}."
+container_not_protected: "&cEste contenedor no está protegido."
+container_not_owned: "&cSolo puedes renombrar contenedores que sean tuyos."
+container_no_custom_name: "&cEste contenedor no tiene ningún nombre personalizado."
+name_empty: "&cEl nombre no puede estar vacío."
+name_too_short: "&cEl nombre debe tener al menos {details} carácter(es)."
+name_too_long: "&cEl nombre no puede pasar de {details} caracteres."
+name_invalid_characters: "&cEse nombre contiene caracteres que no están permitidos."
+name_forbidden: "&cEse nombre no está permitido."
+container_generic_name: "contenedor"
+
+# --- Nombres de tipos de contenedor ---
+#
+# Se muestran en {container} cuando el contenedor no tiene nombre personalizado. Van por familia: los
+# 17 colores de caja de shulker comparten nombre, y todas las fases de oxidación del cofre de cobre
+# también.
+
+container_type_chest: "cofre"
+container_type_trapped_chest: "cofre trampa"
+container_type_copper_chest: "cofre de cobre"
+container_type_barrel: "barril"
+container_type_shulker_box: "caja de shulker"
+container_type_crafter: "fabricador"
+container_type_other: "contenedor"
+
+# --- Avisos de acceso ---
+#
+# Admiten {container} y {owner}. {container} es el nombre personalizado del contenedor si tiene uno,
+# puesto con /renamecontainer, y si no el nombre del tipo.
+
+owner_access_notice: "&7(Tu {container})"
+admin_access_notice: "&6(Acceso de admin al {container} de {owner})"
+trusted_access_notice: "&b(Acceso concedido al {container} de {owner})"
+chest_break_warning: "&eHas roto tu {container} protegido."
+admin_chest_break_notice: "&e(Admin) Has roto el {container} protegido de {owner}."

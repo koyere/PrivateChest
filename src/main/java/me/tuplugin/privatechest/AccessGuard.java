@@ -182,10 +182,9 @@ public final class AccessGuard {
     }
 
     private void send(Player player, String key, Protection protection) {
-        MessageManager messages = plugin.getMessageManager();
-        messages.send(player, messages.get(key)
-                .replace("{container}", describe(protection))
-                .replace("{owner}", ownerName(protection)));
+        plugin.getMessageManager().send(player, key,
+                "container", describe(protection),
+                "owner", ownerName(protection));
     }
 
     /**

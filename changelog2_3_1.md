@@ -67,13 +67,12 @@
 - Thread safety improvements are transparent — no action needed
 
 ### Compatibility
-- Minecraft 1.16.x – 1.21.11
+- Minecraft 1.16.x – 1.21.x
 - Tested on Paper, Purpur, Pufferfish, and Spigot
 
 ---
 
 ## Support & Feedback
-- Report issues on GitHub: [PrivateChest Issues](https://github.com/anthropics/claude-code/issues)
 - SpigotMC Resource: https://www.spigotmc.org/resources/privatechest.124359/
 
 Thank you for using PrivateChest!

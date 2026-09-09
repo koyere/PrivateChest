@@ -13,6 +13,9 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
+/**
+ * Locks the container a player is looking at with a password.
+ */
 public class LockCommand implements CommandExecutor, TabCompleter {
 
     private final PrivateChest plugin;
@@ -22,27 +25,27 @@ public class LockCommand implements CommandExecutor, TabCompleter {
 
     public LockCommand(PrivateChest plugin) {
         this.plugin = plugin;
-        this.chestLocker = ChestLocker.getInstance();
-        this.limitManager = LimitManager.getInstance();
+        this.chestLocker = plugin.getChestLocker();
+        this.limitManager = plugin.getLimitManager();
         this.messages = plugin.getMessageManager();
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player)) {
-            messages.send(sender, messages.raw("console_only_player"));
+            messages.sendRaw(sender, "console_only_player");
             return true;
         }
 
         Player player = (Player) sender;
 
         if (!player.hasPermission("privatechest.lock")) {
-            messages.send(player, messages.raw("no_permission"));
+            messages.sendRaw(player, "no_permission");
             return true;
         }
 
         if (args.length != 1) {
-            messages.send(player, messages.raw("usage_lock"));
+            messages.sendRaw(player, "usage_lock");
             return true;
         }
 
@@ -50,21 +53,19 @@ public class LockCommand implements CommandExecutor, TabCompleter {
         Block targetBlock = ContainerUtils.getTargetContainer(player);
 
         if (targetBlock == null) {
-            messages.send(player, messages.get("not_a_chest"));
+            messages.send(player, "not_a_chest");
             return true;
         }
 
         Set<Block> blocksToLock = ContainerUtils.getContainerBlocks(targetBlock);
-
         if (blocksToLock.isEmpty()) {
-            messages.send(player, messages.get("not_a_chest"));
+            messages.send(player, "not_a_chest");
             return true;
         }
 
-        // Check if any part is already locked
         for (Block block : blocksToLock) {
             if (chestLocker.isChestLocked(block)) {
-                messages.send(player, messages.get("already_locked"));
+                messages.send(player, "already_locked");
                 return true;
             }
         }
@@ -75,7 +76,7 @@ public class LockCommand implements CommandExecutor, TabCompleter {
         LimitManager.LimitCheck limitCheck =
                 limitManager.checkCanLock(player, targetBlock.getType(), blocksToLock.size());
         if (!limitCheck.isAllowed()) {
-            messages.send(player, limitManager.getDeniedMessage(limitCheck));
+            messages.sendText(player, limitManager.getDeniedMessage(limitCheck));
             return true;
         }
 
@@ -96,25 +97,21 @@ public class LockCommand implements CommandExecutor, TabCompleter {
             for (Block locked : lockedParts) {
                 chestLocker.removeProtection(locked);
             }
+            messages.send(player, "error_generic");
+            return true;
         }
 
-        // Send feedback
-        if (allLockedSuccessfully) {
-            messages.send(player, messages.get("locked")
-                    .replace("{container}", limitManager.familyName(family)));
+        messages.send(player, "locked", "container", limitManager.familyName(family));
 
-            String warningMessage = limitManager.getLimitWarningMessage(player, family);
-            if (warningMessage != null) {
-                messages.send(player, warningMessage);
-            }
+        String warningMessage = limitManager.getLimitWarningMessage(player, family);
+        if (warningMessage != null) {
+            messages.sendText(player, warningMessage);
+        }
 
-            if (limitManager.areLimitsEnabled() && !player.hasPermission("privatechest.admin")) {
-                messages.send(player, messages.get("limit_status")
-                        .replace("{status}", limitManager.getLimitStatus(player, family))
-                        .replace("{container}", limitManager.familyName(family)));
-            }
-        } else {
-            messages.send(player, messages.get("error_generic"));
+        if (limitManager.areLimitsEnabled() && !player.hasPermission("privatechest.admin")) {
+            messages.send(player, "limit_status",
+                    "status", limitManager.getLimitStatus(player, family),
+                    "container", limitManager.familyName(family));
         }
 
         return true;

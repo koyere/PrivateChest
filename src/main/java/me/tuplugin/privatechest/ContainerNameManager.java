@@ -7,6 +7,7 @@ import me.tuplugin.privatechest.storage.ProtectionStore;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
+import java.util.List;
 import java.util.regex.Pattern;
 
 /**
@@ -21,22 +22,60 @@ import java.util.regex.Pattern;
  */
 public class ContainerNameManager {
 
-    private static final int MAX_NAME_LENGTH = 16;
-    private static final int MIN_NAME_LENGTH = 1;
-    private static final Pattern VALID_NAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_\\-\\s]+$");
+    private static final int DEFAULT_MAX_LENGTH = 16;
+    private static final int DEFAULT_MIN_LENGTH = 1;
 
-    /** Names that would be confusing or misleading on a container label. */
-    private static final String[] FORBIDDEN_NAMES = {
-            "null", "undefined", "admin", "console", "system", "server",
-            "privatechest", "chest", "container", "locked", "protected"
-    };
+    /**
+     * Default character rule.
+     *
+     * <p>Uses the Unicode letter and digit classes rather than {@code a-zA-Z0-9}. The old pattern
+     * rejected every accented character, so players on a Spanish, French, German or Portuguese server
+     * could not use their own language in a container name.</p>
+     */
+    private static final String DEFAULT_PATTERN = "^[\\p{L}\\p{N}_\\-\\s]+$";
 
     private final PrivateChest plugin;
     private final ProtectionStore store;
 
+    private Pattern namePattern;
+
     public ContainerNameManager(PrivateChest plugin, ProtectionStore store) {
         this.plugin = plugin;
         this.store = store;
+        reload();
+    }
+
+    /**
+     * Re-reads the naming rules from the configuration.
+     */
+    public void reload() {
+        String configured = plugin.getConfig().getString("container-names.pattern", DEFAULT_PATTERN);
+        try {
+            namePattern = Pattern.compile(configured);
+        } catch (Exception e) {
+            plugin.getLogger().warning("[Names] container-names.pattern is not a valid regular expression ("
+                    + e.getMessage() + "). Using the default.");
+            namePattern = Pattern.compile(DEFAULT_PATTERN);
+        }
+    }
+
+    private int getMinLength() {
+        return Math.max(1, plugin.getConfig().getInt("container-names.min-length", DEFAULT_MIN_LENGTH));
+    }
+
+    private int getMaxLength() {
+        return Math.max(getMinLength(),
+                plugin.getConfig().getInt("container-names.max-length", DEFAULT_MAX_LENGTH));
+    }
+
+    /**
+     * Names the server owner does not want on a container label.
+     *
+     * <p>Configurable because the 2.x list was English only, so nothing stopped a player on a Spanish
+     * server from naming a container "cofre" or "admin_es".</p>
+     */
+    private List<String> getForbiddenNames() {
+        return plugin.getConfig().getStringList("container-names.forbidden");
     }
 
     /**
@@ -167,17 +206,19 @@ public class ContainerNameManager {
         }
 
         String trimmedName = name.trim();
+        int minLength = getMinLength();
+        int maxLength = getMaxLength();
 
-        if (trimmedName.length() < MIN_NAME_LENGTH) {
-            return new NameValidationResult(false, "name_too_short", String.valueOf(MIN_NAME_LENGTH));
+        if (trimmedName.length() < minLength) {
+            return new NameValidationResult(false, "name_too_short", String.valueOf(minLength));
         }
-        if (trimmedName.length() > MAX_NAME_LENGTH) {
-            return new NameValidationResult(false, "name_too_long", String.valueOf(MAX_NAME_LENGTH));
+        if (trimmedName.length() > maxLength) {
+            return new NameValidationResult(false, "name_too_long", String.valueOf(maxLength));
         }
-        if (!VALID_NAME_PATTERN.matcher(trimmedName).matches()) {
+        if (!namePattern.matcher(trimmedName).matches()) {
             return new NameValidationResult(false, "name_invalid_characters");
         }
-        for (String forbidden : FORBIDDEN_NAMES) {
+        for (String forbidden : getForbiddenNames()) {
             if (trimmedName.equalsIgnoreCase(forbidden)) {
                 return new NameValidationResult(false, "name_forbidden");
             }

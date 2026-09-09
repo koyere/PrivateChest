@@ -33,27 +33,26 @@ public class UnlockCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player)) {
-            messages.send(sender, messages.raw("console_only_player"));
+            messages.sendRaw(sender, "console_only_player");
             return true;
         }
 
         Player player = (Player) sender;
 
         if (!player.hasPermission("privatechest.unlock")) {
-            messages.send(player, messages.raw("no_permission"));
+            messages.sendRaw(player, "no_permission");
             return true;
         }
 
         if (args.length != 1) {
-            messages.send(player, messages.raw("usage_unlock"));
+            messages.sendRaw(player, "usage_unlock");
             return true;
         }
 
         AttemptTracker attempts = plugin.getPasswordAttempts();
         long lockout = attempts.getRemainingLockoutSeconds(player.getUniqueId());
         if (lockout > 0L) {
-            messages.send(player, messages.get("too_many_attempts")
-                    .replace("{seconds}", String.valueOf(lockout)));
+            messages.send(player, "too_many_attempts", "seconds", lockout);
             return true;
         }
 
@@ -61,7 +60,7 @@ public class UnlockCommand implements CommandExecutor, TabCompleter {
         Block targetBlock = ContainerUtils.getTargetContainer(player);
 
         if (targetBlock == null) {
-            messages.send(player, messages.get("not_a_chest"));
+            messages.send(player, "not_a_chest");
             return true;
         }
 
@@ -76,12 +75,12 @@ public class UnlockCommand implements CommandExecutor, TabCompleter {
         }
 
         if (lockedBlock == null) {
-            messages.send(player, messages.raw("not_locked"));
+            messages.sendRaw(player, "not_locked");
             return true;
         }
 
         if (!chestLocker.isOwner(lockedBlock, player)) {
-            messages.send(player, messages.get("not_your_chest"));
+            plugin.getAccessGuard().denyAccess(player, chestLocker.getProtection(lockedBlock));
             return true;
         }
 
@@ -94,7 +93,7 @@ public class UnlockCommand implements CommandExecutor, TabCompleter {
         for (Block part : containerBlocks) {
             chestLocker.removeProtection(part);
         }
-        messages.send(player, messages.get("unlocked"));
+        messages.send(player, "unlocked");
         return true;
     }
 
@@ -109,11 +108,10 @@ public class UnlockCommand implements CommandExecutor, TabCompleter {
         }
 
         if (lockedOut) {
-            long remaining = attempts.getRemainingLockoutSeconds(player.getUniqueId());
-            messages.send(player, messages.get("too_many_attempts")
-                    .replace("{seconds}", String.valueOf(remaining)));
+            messages.send(player, "too_many_attempts",
+                    "seconds", attempts.getRemainingLockoutSeconds(player.getUniqueId()));
         } else {
-            messages.send(player, messages.get("wrong_password"));
+            messages.send(player, "wrong_password");
         }
     }
 

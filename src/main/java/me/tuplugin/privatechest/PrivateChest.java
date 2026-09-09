@@ -35,7 +35,7 @@ public class PrivateChest extends JavaPlugin {
         instance = this;
 
         getLogger().info("Running on " + SchedulerUtils.getServerSoftware()
-                + " (Minecraft " + getServer().getBukkitVersion().split("-")[0] + ")");
+                + " (Minecraft " + SchedulerUtils.getMinecraftVersion() + ")");
 
         if (!getDataFolder().exists() && !getDataFolder().mkdirs()) {
             getLogger().severe("Could not create the plugin folder. Disabling.");
@@ -43,10 +43,10 @@ public class PrivateChest extends JavaPlugin {
             return;
         }
 
-        // Create the bundled files if missing, then add any options introduced by this update.
+        // Create config.yml if missing, then add any options introduced by this update.
+        // messages.yml is handled by MessageManager, which has to know the configured language first.
         saveDefaultConfig();
         FileUtil.updateConfig(this, "config.yml");
-        FileUtil.updateConfig(this, "messages.yml");
         reloadConfig();
 
         messageManager = new MessageManager(this);
@@ -152,6 +152,7 @@ public class PrivateChest extends JavaPlugin {
     public void reloadSettings() {
         applySecuritySettings();
         containerRegistry.load();
+        containerNameManager.reload();
     }
 
     /**

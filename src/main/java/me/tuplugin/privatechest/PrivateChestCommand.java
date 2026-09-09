@@ -32,12 +32,12 @@ public class PrivateChestCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("privatechest.admin")) {
-            messages.send(sender, messages.raw("no_permission"));
+            messages.sendRaw(sender, "no_permission");
             return true;
         }
 
         if (args.length == 0) {
-            messages.send(sender, messages.raw("usage_privatechest"));
+            messages.sendRaw(sender, "usage_privatechest");
             return true;
         }
 
@@ -55,7 +55,7 @@ public class PrivateChestCommand implements CommandExecutor, TabCompleter {
                 handleMigrate(sender, args);
                 return true;
             default:
-                messages.send(sender, messages.raw("usage_privatechest"));
+                messages.sendRaw(sender, "usage_privatechest");
                 return true;
         }
     }
@@ -63,57 +63,53 @@ public class PrivateChestCommand implements CommandExecutor, TabCompleter {
     private void handleReload(CommandSender sender) {
         plugin.reloadConfig();
         messages.reload();
-        // Settings that are read once, such as password hashing and the container list, have to be
-        // re-applied explicitly. Everything else is read at the point of use.
+        // Settings that are read once, such as password hashing, the container list and the naming
+        // rules, have to be re-applied explicitly. Everything else is read at the point of use.
         plugin.reloadSettings();
-        messages.send(sender, messages.get("reload_success"));
+        messages.send(sender, "reload_success");
     }
 
     private void handleStatus(CommandSender sender) {
         DataManager dataManager = plugin.getDataManager();
 
-        messages.send(sender, messages.get("status_header"));
-        messages.send(sender, messages.raw("status_storage")
-                .replace("{type}", dataManager.getStorageType()));
-        messages.send(sender, messages.raw("status_containers")
-                .replace("{amount}", String.valueOf(plugin.getProtectionStore().size())));
-        messages.send(sender, messages.raw("status_trust")
-                .replace("{amount}", String.valueOf(plugin.getTrustManager().getTotalTrustCount())));
-        messages.send(sender, messages.raw("status_container_types")
-                .replace("{amount}", String.valueOf(plugin.getContainerRegistry().size())));
-        messages.send(sender, messages.raw("status_pending")
-                .replace("{state}", messages.raw(dataManager.hasPendingChanges()
-                        ? "status_pending_yes" : "status_pending_no")));
+        messages.send(sender, "status_header");
+        messages.sendRaw(sender, "status_storage", "type", dataManager.getStorageType());
+        messages.sendRaw(sender, "status_containers", "amount", plugin.getProtectionStore().size());
+        messages.sendRaw(sender, "status_trust", "amount", plugin.getTrustManager().getTotalTrustCount());
+        messages.sendRaw(sender, "status_container_types", "amount", plugin.getContainerRegistry().size());
+        messages.sendRaw(sender, "status_pending", "state",
+                messages.rawFor(sender, dataManager.hasPendingChanges()
+                        ? "status_pending_yes" : "status_pending_no"));
     }
 
     private void handleSave(CommandSender sender) {
         boolean saved = plugin.getDataManager().flushNow();
-        messages.send(sender, saved ? messages.get("save_success") : messages.get("save_failed"));
+        messages.send(sender, saved ? "save_success" : "save_failed");
     }
 
     private void handleMigrate(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            messages.send(sender, messages.raw("usage_migrate"));
+            messages.sendRaw(sender, "usage_migrate");
             return;
         }
 
         String target = args[1].toLowerCase();
-        messages.send(sender, messages.get("migrate_started").replace("{type}", target));
+        messages.send(sender, "migrate_started", "type", target);
 
         DataManager.MigrationResult result = plugin.getDataManager().migrate(target);
         switch (result) {
             case SUCCESS:
-                messages.send(sender, messages.get("migrate_success").replace("{type}", target));
+                messages.send(sender, "migrate_success", "type", target);
                 break;
             case ALREADY_ACTIVE:
-                messages.send(sender, messages.get("migrate_already_active").replace("{type}", target));
+                messages.send(sender, "migrate_already_active", "type", target);
                 break;
             case UNKNOWN_TYPE:
-                messages.send(sender, messages.raw("usage_migrate"));
+                messages.sendRaw(sender, "usage_migrate");
                 break;
             case FAILED:
             default:
-                messages.send(sender, messages.get("migrate_failed"));
+                messages.send(sender, "migrate_failed");
                 break;
         }
     }

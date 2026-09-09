@@ -29,28 +29,26 @@ public class ClearChestsCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("privatechest.admin")) {
-            messages.send(sender, messages.raw("no_permission"));
+            messages.sendRaw(sender, "no_permission");
             return true;
         }
 
-        messages.send(sender, messages.raw("cleaning_start"));
+        messages.sendRaw(sender, "cleaning_start");
 
         plugin.getAutoCleanupManager().runCleanup(AutoCleanupManager.CleanupType.MANUAL, report -> {
             if (report.wasAlreadyRunning()) {
-                messages.send(sender, messages.raw("cleanup_already_running"));
+                messages.sendRaw(sender, "cleanup_already_running");
                 return;
             }
 
             if (report.getCleanedContainers() > 0) {
-                messages.send(sender, messages.raw("cleaned_chests")
-                        .replace("{amount}", String.valueOf(report.getCleanedContainers())));
+                messages.sendRaw(sender, "cleaned_chests", "amount", report.getCleanedContainers());
             } else {
-                messages.send(sender, messages.raw("no_chests_to_clean"));
+                messages.sendRaw(sender, "no_chests_to_clean");
             }
 
             if (report.getSkippedUnloaded() > 0) {
-                messages.send(sender, messages.raw("clean_skipped_unloaded")
-                        .replace("{amount}", String.valueOf(report.getSkippedUnloaded())));
+                messages.sendRaw(sender, "clean_skipped_unloaded", "amount", report.getSkippedUnloaded());
             }
         });
 

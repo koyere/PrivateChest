@@ -14,60 +14,49 @@ import org.bukkit.entity.Player;
 import me.tuplugin.privatechest.util.TabUtils;
 
 /**
- * Command executor for the /renamecontainer command.
- * Allows players to assign custom names to their protected containers.
- * This is a basic implementation suitable for the free version of PrivateChest.
- * 
+ * Assigns a custom name to a protected container.
+ *
+ * <p>The name is shown wherever the plugin refers to the container, through the {@code {container}}
+ * placeholder. In 2.x the name was stored and never displayed anywhere, so renaming had no observable
+ * effect.</p>
+ *
  * @since 2.1
- * @author PrivateChest Team
  */
 public class RenameCommand implements CommandExecutor, TabCompleter {
 
     /** Words that clear the name instead of setting one. */
     private static final List<String> CLEAR_KEYWORDS = Arrays.asList("remove", "clear", "delete");
 
-    private final PrivateChest plugin;
     private final ContainerNameManager nameManager;
-    private final ChestLocker chestLocker;
-    private final MessageManager messageManager;
+    private final MessageManager messages;
 
-    /**
-     * Constructs a new RenameCommand executor.
-     * 
-     * @param plugin The main plugin instance
-     */
     public RenameCommand(PrivateChest plugin) {
-        this.plugin = plugin;
         this.nameManager = plugin.getContainerNameManager();
-        this.chestLocker = plugin.getChestLocker();
-        this.messageManager = plugin.getMessageManager();
+        this.messages = plugin.getMessageManager();
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        // Only players can use this command
         if (!(sender instanceof Player)) {
-            messageManager.send(sender, messageManager.raw("console_only_player"));
+            messages.sendRaw(sender, "console_only_player");
             return true;
         }
 
         Player player = (Player) sender;
 
-        // Check permission
         if (!player.hasPermission("privatechest.rename")) {
-            messageManager.send(player, messageManager.raw("no_permission"));
+            messages.sendRaw(player, "no_permission");
             return true;
         }
 
-        // Check for correct usage
         if (args.length == 0) {
-            messageManager.send(player, messageManager.get("usage_rename_container"));
+            messages.send(player, "usage_rename_container");
             return true;
         }
 
         Block targetBlock = ContainerUtils.getTargetContainer(player);
         if (targetBlock == null) {
-            messageManager.send(player, messageManager.raw("not_a_chest"));
+            messages.sendRaw(player, "not_a_chest");
             return true;
         }
 
@@ -83,62 +72,32 @@ public class RenameCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    /**
-     * Handles setting a new name for a container.
-     * 
-     * @param player The player executing the command
-     * @param location The location of the container
-     * @param name The desired name for the container
-     */
     private void handleSetName(Player player, Location location, String name) {
         ContainerNameManager.NameResult result = nameManager.setContainerName(location, player, name);
-        
-        if (result.isSuccess()) {
-            messageManager.send(player, messageManager.get(result.getMessageKey())
-                    .replace("{name}", name)
-                    .replace("{container}", getContainerTypeName(location)));
-        } else {
-            String message = messageManager.get(result.getMessageKey());
-            
-            // Add details if available
-            if (result.getDetails() != null) {
-                message = message.replace("{details}", result.getDetails())
-                                .replace("{limit}", result.getDetails());
-            }
-            
-            messageManager.send(player, message);
-        }
+
+        messages.send(player, result.getMessageKey(),
+                "name", name,
+                "container", containerName(location),
+                "details", result.getDetails() == null ? "" : result.getDetails(),
+                "limit", result.getDetails() == null ? "" : result.getDetails());
     }
 
-    /**
-     * Handles removing a name from a container.
-     * 
-     * @param player The player executing the command
-     * @param location The location of the container
-     */
     private void handleRemoveName(Player player, Location location) {
+        // Read the name before it is cleared, so the confirmation can still refer to it.
+        String describedBefore = containerName(location);
+
         ContainerNameManager.NameResult result = nameManager.removeContainerName(location, player);
-        
-        if (result.isSuccess()) {
-            messageManager.send(player, messageManager.get(result.getMessageKey())
-                    .replace("{container}", getContainerTypeName(location)));
-        } else {
-            messageManager.send(player, messageManager.get(result.getMessageKey()));
-        }
+
+        messages.send(player, result.getMessageKey(),
+                "container", result.isSuccess() ? describedBefore : containerName(location));
     }
 
     /**
-     * Gets a user-friendly name for the container type at the given location.
-     * 
-     * @param location The location of the container
-     * @return A display name for the container type
+     * The container's display name, or the generic word if it cannot be determined.
      */
-    private String getContainerTypeName(Location location) {
+    private String containerName(Location location) {
         String displayName = nameManager.getDisplayName(location);
-        if (displayName != null) {
-            return displayName;
-        }
-        return messageManager.raw("container_generic_name");
+        return displayName != null ? displayName : messages.raw("container_generic_name");
     }
 
     @Override

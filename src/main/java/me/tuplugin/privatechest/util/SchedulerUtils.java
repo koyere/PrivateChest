@@ -45,6 +45,10 @@ public final class SchedulerUtils {
     private static Method regionExecuteLocation;
     private static Method scheduledTaskCancel;
 
+    // Resolved on first use rather than at class load, since it needs a running server.
+    private static Method minecraftVersionMethod;
+    private static boolean resolvedMinecraftVersion;
+
     static {
         boolean folia;
         try {
@@ -216,6 +220,43 @@ public final class SchedulerUtils {
     }
 
     // --- Server identification ---
+
+    /**
+     * The Minecraft version, for the startup log.
+     *
+     * <p>Prefers the server's own accessor where it exists. Falling back to the Bukkit version string
+     * is not enough on its own: some forks report build metadata in it, so Purpur 26.1.2 comes through
+     * as {@code 26.1.2.build.2587-R0.1-SNAPSHOT}, which reads like a build number rather than a
+     * version.</p>
+     */
+    public static String getMinecraftVersion() {
+        if (!resolvedMinecraftVersion) {
+            resolvedMinecraftVersion = true;
+            try {
+                minecraftVersionMethod = Bukkit.getServer().getClass().getMethod("getMinecraftVersion");
+            } catch (Exception e) {
+                minecraftVersionMethod = null;
+            }
+        }
+
+        if (minecraftVersionMethod != null) {
+            try {
+                Object version = minecraftVersionMethod.invoke(Bukkit.getServer());
+                if (version instanceof String && !((String) version).isEmpty()) {
+                    return (String) version;
+                }
+            } catch (Exception e) {
+                minecraftVersionMethod = null;
+            }
+        }
+
+        String bukkitVersion = Bukkit.getBukkitVersion();
+        int dash = bukkitVersion.indexOf('-');
+        String base = dash > 0 ? bukkitVersion.substring(0, dash) : bukkitVersion;
+
+        int build = base.indexOf(".build");
+        return build > 0 ? base.substring(0, build) : base;
+    }
 
     /**
      * The server software name, for the startup log.

@@ -1,561 +1,318 @@
 # PrivateChest 3.0
 
-> Work in progress. This file grows as the 3.0 work lands.
-> Everything below is already in the build.
+The largest release so far. Every part of the plugin was reworked: storage, protection, threading,
+version support and translation. Several features that were configurable in 2.x but did nothing are now
+connected, and several ways to lose data or bypass protection are closed.
 
 ---
 
-## Before you update
+## Updating from 2.x
 
-**Back up your `plugins/PrivateChest/` folder.** The plugin also does this for you: the first time 3.0
-starts it copies your existing data aside before touching it.
+**Back up your `plugins/PrivateChest/` folder.** Then drop in the new jar and restart. No manual
+conversion, no downtime, no data file changes.
 
-- YAML users get `data.yml.v2-backup`
-- SQLite users get `privatechest.db.v2-backup`, and the old table is kept inside the database as
-  `privatechest_data_v2_backup`
+### Done for you
 
-Your data file format does not change, so nothing needs converting and no downtime is required. Drop
-in the new jar and restart.
-
-**One thing to check if you use SQLite:** trust relations and container names were never actually
-being saved by the SQLite backend in 2.x. They were accepted and discarded, so they disappeared on
-every restart. 3.0 stores them properly, but it cannot recover what earlier versions threw away. Your
-players may need to run `/trust` again once.
-
----
-
-## Storage and performance
-
-### Saves no longer happen on every action
-
-Previously, every lock, unlock, container break, `/trust` and rename rewrote the **entire** dataset
-immediately, on the main server thread. On YAML that meant rewriting all of `data.yml`; on SQLite it
-deleted every row and reinserted all of them. On a server with thousands of protected containers,
-every single one of those actions was a visible stutter.
-
-Changes are now collected in memory and written by a background thread on a fixed interval. Ten
-players locking chests in the same second produce one write instead of ten full rewrites, and none of
-it runs on a server thread.
-
-New setting in `config.yml`:
-
-```yaml
-# How often, in seconds, pending changes are written to disk.
-save-interval-seconds: 5
-```
-
-A clean shutdown or restart always writes everything, regardless of this value. A hard crash (power
-loss, `kill -9`) can lose at most this many seconds of changes. You can force a write at any time
-with `/privatechest save`.
-
-### Writes can no longer corrupt data.yml
-
-`data.yml` is now written to a temporary file and then moved into place. Before, an interrupted save
-(crash, full disk, container killed mid-write) could leave a truncated file behind and destroy every
-protection on the server.
-
-### SQLite is now the faster option, as intended
-
-- Only the rows that actually changed are written, inside a transaction
-- Write-ahead logging is enabled
-- The owner column is indexed, which is what makes per-player limit checks cheap
-- Container names and trust relations are stored (see the note above)
-
-If SQLite fails to open at startup, the plugin now falls back to YAML and keeps running instead of
-starting up with no protection.
-
-### Per-player limit checks stopped loading chunks
-
-Checking a player's container count used to read every one of their recorded positions back out of
-the world, forcing the server to load a chunk for each one. Counts are now answered from memory. The
-container type is recorded when a container is locked, so per-type questions do not need the world
-either.
-
-`/clearchests` follows the same rule: it only examines positions in chunks that are already loaded,
-and tells you how many it skipped rather than loading the whole world to check them.
-
----
-
-## Data safety fixes
-
-### Protections in unloaded worlds are no longer deleted
-
-If a world was not loaded when the plugin started, every protection inside it was dropped from memory
-and the next save wrote that loss to disk permanently. This affected anyone unmounting a world
-temporarily, or using a world manager that loads worlds after plugins start.
-
-Those records are now kept and applied if the world is loaded later. The startup log tells you how
-many protections belong to worlds that are not currently mounted, and which worlds they are.
-
-### Worlds with a dot in the name
-
-A world named something like `world.old` had its protection records silently mangled, because the
-world name was being treated as a path. Fixed.
-
-### Damaged records are reported instead of ignored
-
-Records that cannot be read are now counted and reported in the startup log with the reason, instead
-of vanishing quietly.
-
-### Legacy passwords containing a colon
-
-A password stored in plain text by a pre-2.0 version that happened to contain a `:` was mistaken for
-an already-hashed value. It was never upgraded and could never be verified again, permanently locking
-the owner out of their own container. The stored format is now matched exactly.
-
-### Half-locked double chests
-
-If locking a double chest failed partway through, one half stayed protected and the other was left
-open. The operation is now rolled back as a unit.
-
----
-
-## Commands
-
-`/privatechest` used to reload on any argument at all, including typos. It now has real subcommands
-(all under `privatechest.admin`, with tab completion):
-
-| Command | What it does |
+| | |
 |:---|:---|
-| `/privatechest reload` | Reload `config.yml` and `messages.yml` |
-| `/privatechest status` | Storage backend in use, protected container count, trust relation count, and whether anything is waiting to be written |
-| `/privatechest save` | Write all pending changes to disk immediately |
-| `/privatechest migrate <yaml\|sqlite>` | Move all data to the other backend and switch to it |
+| Backups | `data.yml.v2-backup`, or `privatechest.db.v2-backup` plus a `privatechest_data_v2_backup` table |
+| Data format | Unchanged, read as-is |
+| Passwords | Old formats still work, upgraded to PBKDF2 as each is entered correctly |
+| Plain text passwords | Hashed at first startup (pre-2.0 data only) |
+| New config options | Added to `config.yml`, your values untouched |
+| New messages | Added to `messages.yml`, your wording untouched |
 
-`/privatechest migrate` was documented in `config.yml` in 2.x but did not exist. It now works: it
-writes everything to the target backend, switches over live, updates `storage-type` in your
-`config.yml` for you, and leaves the old data files untouched as a backup. Your comments in
-`config.yml` are preserved. If the migration fails at any point, the current backend stays in use and
-is not modified.
+### Needs your attention
 
-### Small fixes
+**1. SQLite users: trust and container names were never saved by 2.x.** The SQLite backend accepted
+them and discarded them, so they vanished on every restart. 3.0 stores them properly but cannot recover
+what earlier versions threw away. Your players may need to run `/trust` again once.
 
-- Breaking your own `[Private]` sign told you it was an admin action. It now says the right thing.
-- `/lockchest` and `/unlockchest` used a hardcoded English message when run from console. They use
-  `console_only_player` from `messages.yml` like every other command.
-- Player names that cannot be resolved in `/trust list` now use the new `unknown_player` message key
-  instead of a hardcoded word.
-- "Unlimited" in the limit status line is now the `limit_unlimited` message key instead of hardcoded
-  English.
+**2. Per-shulker-colour limits are gone.** If you configured
+`container-limits.types.white_shulker_box` and friends, replace them with the single `shulker_box`
+entry. Old keys and the old per-colour permission nodes are ignored.
 
----
+**3. Four behaviour changes.** All of them make the plugin stricter or fix something broken:
 
-## New message keys
-
-Added automatically to your `messages.yml` on first start; your existing wording is left alone.
-
-```
-unknown_player, limit_unlimited, container_generic_name, clean_skipped_unloaded,
-cleanup_already_running, usage_privatechest, usage_migrate, migrate_started, migrate_success,
-migrate_already_active, migrate_failed, save_success, save_failed, status_header, status_storage,
-status_containers, status_trust, status_pending, status_pending_yes, status_pending_no
-```
-
----
-
-## Folia and threaded server support
-
-2.x advertised Folia support and did not have it. `folia-supported: true` was declared in
-`plugin.yml`, but several parts of the plugin used the standard Bukkit scheduler or read blocks from
-the wrong thread, which either throws or corrupts state on a regionised server.
-
-### What was broken
-
-- **`/renamecontainer` did not work on Folia at all.** It saved through the standard async scheduler,
-  which Folia does not support.
-- **The automatic cleanup read blocks from an asynchronous timer.** That is unsafe on Paper and fails
-  outright on Folia, and it meant protections could be deleted based on an inconsistent read of the
-  world.
-- **`/clearchests` read every recorded position from the command thread.** On Folia that is illegal as
-  soon as a record belongs to another region.
-- **Repeating tasks could not be cancelled on Folia**, so the cleanup timer kept running after the
-  plugin was disabled or reloaded.
-
-### What it does now
-
-Cleanup runs in two stages. Choosing what to check only reads memory, so it stays off the server
-threads. Actually looking at a block is grouped by chunk and handed to the thread that owns that
-chunk: the region thread on Folia, the main thread in small batches everywhere else. Records in chunks
-that are not loaded are never touched, on any platform.
-
-`/clearchests` now uses that same engine. It reports its results when the work finishes, tells you how
-many records it skipped because their chunks were not loaded, and refuses to pile up if a cleanup is
-already running.
-
-Two side benefits on regular servers as well:
-
-- Cleanup no longer forces chunks to load, and is spread over several ticks instead of running in one
-  block. On a large server the periodic pass is no longer a measurable hitch.
-- Per-player limit checks never read the world. Nothing on a hot path does anymore.
-
-### Supported software
-
-Verified against the scheduler contracts of Folia and its forks (Luminol, LightingLuminol, LeafMC,
-Kaiiju) as well as Paper, Purpur, Pufferfish and Spigot. The startup line tells you which one was
-detected. If a Folia server ever presents a scheduler the plugin cannot use, it logs a clear warning
-and falls back instead of failing silently.
-
----
-
-## Tab completion
-
-Every command and subcommand now completes, and completion respects permissions: a player who cannot
-run a command is offered nothing for it.
-
-| Command | Suggestions |
+| Change | Why |
 |:---|:---|
-| `/privatechest` | `reload`, `status`, `save`, `migrate` — then `yaml` or `sqlite` for `migrate` |
-| `/trust` | `list`, plus online players you can see, minus the ones you already trust |
-| `/untrust` | `all`, plus the players you have actually trusted, online or not |
-| `/renamecontainer` | `remove`, `clear`, `delete` |
-| `/lockchest`, `/unlockchest` | nothing, deliberately |
-| `/clearchests` | nothing, it takes no arguments |
+| Trusted players can no longer **break** containers, only use them | Trust granted destruction rights by accident |
+| Breaking half a double chest no longer unlocks the other half | It used to leave the surviving chest open |
+| Hoppers **can** be placed next to containers you have access to | 2.x refused next to your own chests, breaking players' own sorting systems |
+| `/privatechest` requires a valid subcommand | It used to reload on any argument, including typos |
 
-Two details worth knowing:
-
-- Passwords are never completed. Commands without a completer fall back to the server's default, which
-  suggests online player names, so 2.x was offering your players' names as password candidates. Those
-  commands now return an empty list on purpose.
-- Player suggestions honour vanish. Anyone you cannot see is not listed, so tab completion cannot be
-  used to detect hidden staff.
-
-`/renamecontainer remove` also accepts `clear` and `delete`, and no longer treats those words as a
-container name when combined with other words.
+**4. Optional:** set `language: es` (or your own translation) and delete `messages.yml` if you want it
+recreated in another language.
 
 ---
 
-## Protection gaps closed
+## Data safety
 
-These were all exploitable on 2.3.1. If you run a public server, this is the section that matters.
+Four ways to lose protections, all closed.
 
-### Pistons could move a locked container out of its protection
+- **Worlds not loaded at startup lost every protection inside them.** Records were dropped from memory
+  and the next save wrote that loss to disk permanently. Affects anyone unmounting a world or using a
+  world manager that loads after plugins.
+- **An interrupted save could truncate `data.yml`** and destroy every protection on the server. Writes
+  are now atomic: a temp file moved into place.
+- **Worlds with a dot in the name** (`world.old`) had their records silently mangled.
+- **A pre-2.0 plain text password containing `:`** was mistaken for a hash, never upgraded, and could
+  never be verified again, permanently locking its owner out.
 
-Barrels and shulker boxes can be pushed by a piston. Nothing stopped that, so anyone could shove a
-locked barrel one block sideways: the protection record stayed at the old coordinates, and the
-container came to rest unprotected and open to anyone. Both piston extend and retract are now blocked
-when a protected container would be moved.
-
-### Only right-clicking was checked
-
-All access control ran through the right-click handler. Any other route into a container's contents
-went straight through. The plugin now also checks the inventory open itself, which covers every other
-path, including other plugins opening a container on a player's behalf.
-
-### Fire and mobs could destroy locked containers
-
-Burning and entity-caused block changes are now blocked for protected containers.
-
-### Hoppers could still vacuum items in
-
-Item pickup by hoppers and hopper minecarts is now covered as well, not just container-to-container
-transfers.
-
-### Passwords were hashed with a single pass
-
-Passwords were stored as one round of salted SHA-256, which is fast enough to brute force offline if
-the data file is ever exposed. They are now PBKDF2-HMAC-SHA256 with a configurable iteration count.
-
-**No migration step and no downtime.** Old formats are still read, and each password is rewritten in
-the new format the first time it is entered correctly. Passwords left in plain text by a pre-2.0
-version are hashed at startup, since plain text on disk is worth removing immediately.
-
-```yaml
-security:
-  password-hash-iterations: 20000
-```
-
-Raising this later strengthens existing passwords as players use them, again with no migration.
-Measured cost at the default: about 9ms per `/unlockchest`.
-
-### Password guessing was unlimited and invisible
-
-```yaml
-security:
-  max-password-attempts: 5      # wrong passwords allowed
-  attempt-window-seconds: 60    # before older attempts stop counting
-  lockout-seconds: 300          # how long the player then waits
-  log-failed-attempts: true     # log name and container position to console
-```
-
-### Every message was sent twice
-
-Right-clicking fires once per hand, and the handler did not check which one. Players saw every access
-message duplicated.
-
----
-
-## Two deliberate behaviour changes
-
-Both make the plugin stricter. Read these before updating a live server.
-
-**Trusted players can no longer break your containers.** Trust granted access to the contents and, by
-accident, permission to destroy the container. Trusted players can still open and use containers;
-only the owner and staff with `privatechest.admin` can break them.
-
-**Breaking half of a double chest no longer unlocks the other half.** It used to clear the protection
-on both halves, leaving the surviving chest open. Only the record at the broken position is cleared
-now.
-
-One restriction was relaxed: you can place a hopper, dropper or dispenser next to a locked container
-**you have access to**. 2.x refused next to any locked container, including your own, which broke
-players' own sorting systems. It is still refused next to containers you have no claim to.
+Also: unreadable records are now counted and reported at startup instead of vanishing, and a double
+chest that fails to lock halfway through is rolled back instead of leaving one protected half.
 
 ---
 
 ## Performance
 
-`InventoryMoveItemEvent` fires for every item transfer on the whole server, and 2.x called
-`Block#getState()` on both the source and the destination of each one. That builds a full snapshot of
-the container including a copy of its inventory. It was the plugin's single largest per-tick cost.
+- **Saves no longer happen per action.** Every lock, unlock, break, `/trust` and rename used to rewrite
+  the entire dataset on the main thread. Changes are now collected and written by a background thread on
+  an interval. Ten players locking chests in one second produce one write, not ten full rewrites.
+- **`InventoryMoveItemEvent` was the plugin's biggest per-tick cost.** It fires for every item transfer
+  on the server, and 2.x built a full container snapshot, including a copy of its inventory, for both
+  the source and the destination of each one. Handlers now start with one lookup in a per-chunk index.
+- **Chunk loads removed from hot paths.** Limit checks read every one of a player's recorded positions
+  out of the world on each lock attempt. `/clearchests` did the same for every record on the server.
+  Neither does now, and cleanup only examines chunks that are already loaded.
+- Double chest detection reads block data instead of block state.
+- SQLite writes only changed rows, in a transaction, with WAL and an indexed owner column. It also
+  falls back to YAML instead of starting with no protection if it cannot open.
 
-The registry now keeps an index of which chunks contain protections, so every hot handler starts with
-one map lookup and does no block inspection at all unless something protected is actually nearby.
-Double chest detection reads block data instead of block state, which is the cheap operation.
-
-Servers with no protected containers yet pay essentially nothing.
+```yaml
+save-interval-seconds: 5   # a clean shutdown always writes everything
+```
 
 ---
 
-## New message keys and settings
+## Protection gaps closed
 
-Message keys added: `too_many_attempts`, `block_name_hopper`, `block_name_dropper`,
-`block_name_dispenser`.
+| Gap | Detail |
+|:---|:---|
+| **Pistons** | Barrels and shulker boxes are pushable. A griefer could shove a locked barrel one block: the record stayed at the old coordinates and the container came to rest unprotected |
+| **Only right-clicks were checked** | Any other route into a container's contents went straight through. Opening is now guarded at the inventory level too |
+| **Fire and mobs** | Nothing stopped a protected container burning or being removed by a mob |
+| **Hopper minecarts** | Item pickup into a protected container was not covered |
+| **Duplicate messages** | A right-click fires once per hand and the handler did not check which, so every message arrived twice |
 
-Config section added: `security`, described above. The `automated_block_placement_denied` wording was
-updated to match the relaxed rule, and the hopper block name in it is now translatable rather than
-being derived from the English material name.
+### Passwords
 
-`/privatechest reload` now also re-applies the security settings.
+Stored as **PBKDF2-HMAC-SHA256** with a random salt, instead of one pass of SHA-256 which is fast enough
+to brute force offline. Raising the iteration count later strengthens existing passwords as they are
+used, with no migration step. Measured cost at the default: about 9 ms per `/unlockchest`.
+
+Guessing was also unlimited and invisible. Now rate limited and optionally logged with the player name
+and container position.
+
+```yaml
+security:
+  password-hash-iterations: 20000
+  max-password-attempts: 5
+  attempt-window-seconds: 60
+  lockout-seconds: 300
+  log-failed-attempts: true
+```
 
 ---
 
 ## Minecraft version support
 
-### Copper chests can be protected
+**One jar for 1.16.5 through 26.2.** Everything version-specific resolves at startup.
 
-Copper chests arrived in Minecraft 1.21.9 and could not be protected at all by 2.x. Neither could
-crafters, from 1.21. Both work now, including every oxidation stage and both waxed and unwaxed.
-
-An oxidizing copper chest changes its block type as it weathers. The plugin treats every stage as the
-same container, so a chest that goes from shiny to oxidized stays locked, stays yours, and does not
-shift your container count.
-
-### Containers are no longer a fixed list
-
-2.x carried twenty container types written into the code. That is the reason copper chests were
-unsupported: the list was compiled before they existed.
-
-The list is now resolved when the server starts, and it is yours to change:
+- **Copper chests can be protected**, all oxidation and waxed stages, and **crafters** too. Neither was
+  possible in 2.x, whose container list was twenty types written into the code.
+- **An oxidizing copper chest stays yours.** Its block type changes as it weathers; every stage counts
+  as the same container, so it stays locked and your count does not shift.
+- **`[Private]` signs read both sides.** Signs have had a writable back since 1.20, and a tag written
+  there locked nothing while appearing to.
+- **The container list is yours**, and future containers work without a plugin update:
 
 ```yaml
 containers:
-  auto-discover: true               # protect containers added by future Minecraft versions
-  discovery-patterns:               # how they are recognised
-    - "*_CHEST"
-    - "*_SHULKER_BOX"
-  additional: []                    # e.g. FURNACE, BLAST_FURNACE, BREWING_STAND
-  excluded: ["ENDER_CHEST"]         # never protectable
-  disabled: []                      # stop new locks, keep existing ones
+  auto-discover: true                          # protect containers added by future versions
+  discovery-patterns: ["*_CHEST", "*_SHULKER_BOX"]
+  additional: []                               # e.g. FURNACE, BLAST_FURNACE, BREWING_STAND
+  excluded: ["ENDER_CHEST"]
+  disabled: []                                 # stop new locks, keep existing ones
 ```
 
-With `auto-discover` on, a container added by a future Minecraft update is protectable the day it
-ships, without waiting for a plugin update. Turn it off if you want an exact, fixed list.
+`disabled` never deletes existing data: the cleanup treats a disabled type as still being a container.
 
-`additional` is how you protect things the plugin does not cover by default. Furnaces, blast furnaces,
-smokers and brewing stands are all valid entries.
+### Folia
 
-`disabled` stops new locks on a type without touching protections players already have. The cleanup
-deliberately treats a disabled type as still being a container, so turning one off never deletes
-existing data.
+Folia support was advertised in 2.x and did not exist. `/renamecontainer` failed outright, the cleanup
+read blocks from an async timer, `/clearchests` read across regions, and repeating tasks could not be
+cancelled so they survived plugin disable.
 
-The startup log tells you how many container types are protectable and how many were found
-automatically.
-
-### `[Private]` signs now read both sides
-
-Signs have had a writable back since Minecraft 1.20, and the plugin only ever read the front. A
-`[Private]` tag on the back locked nothing, and breaking such a sign did not release the container it
-appeared to protect. Both sides are read now, on any version.
-
-### Per-family limits replace per-colour limits
-
-Limits and permissions key off a container *family* instead of an exact material:
-
-`chest`, `trapped_chest`, `copper_chest`, `barrel`, `shulker_box`, `crafter`, `other`
-
-```
-privatechest.limit.<family>.<number>
-privatechest.limit.<family>.unlimited
-```
-
-All seventeen shulker box colours count as `shulker_box`. Every copper chest stage counts as
-`copper_chest`. This is not cosmetic: a per-material limit can never work for a container whose
-material changes on its own, which is exactly what copper chests do.
-
-**If you configured the old per-colour limits** (`container-limits.types.white_shulker_box` and
-friends), replace them with the single `shulker_box` entry. The old keys are ignored. The old
-per-colour permission nodes are gone as well.
-
-### Version compatibility
-
-The build still targets the older API on purpose, so one jar covers **Minecraft 1.16.5 through 26.2**.
-Everything version-specific is resolved at runtime: container types by name, sign sides by capability
-check. Features your server is too old for are skipped quietly rather than logged as errors.
-
-### Known gap: copper golems
-
-A copper golem physically carries items out of copper chests and into wooden ones. If your server
-software reports that as a normal item transfer, the existing protection already blocks it, since the
-plugin cancels transfers involving a protected container regardless of what started them. If the
-server implements it as pure mob behaviour instead, there is no event to intercept and no plugin can
-stop it.
-
-I could not verify which of the two it is without a 26.x server to test against, so I am not going to
-claim it is covered. If you run copper golems near protected copper chests, test it on your setup
-before relying on it.
+Block access now runs on the thread that owns the chunk, on Folia, Luminol, LightingLuminol, LeafMC and
+Kaiiju. Two side benefits on regular servers: cleanup is spread over ticks instead of running in one
+block, and it no longer forces chunks to load.
 
 ---
 
-## Small fixes
+## Features that did nothing
 
-- `/lockchest` and `/unlockchest` now use ray tracing to find the container you are looking at, the
-  same method `/renamecontainer` already used. The old method walked the line of sight block by block
-  and could miss a container you were clearly aiming at.
-- The public API's `isLockableContainer` had its own hardcoded container list, separate from the rest
-  of the plugin. It now answers from the same registry as everything else.
-- Container type names shown in messages are translatable (`container_type_chest` and friends) instead
-  of being English strings inside the code.
+Three subsystems were fully written in 2.x and never called.
 
----
+- **Per-container-type limits.** The whole `container-limits` section and every per-type permission node
+  had no effect. `/lockchest` and `[Private]` signs now share one limit check, so they cannot disagree.
+- **Container names.** `/renamecontainer` stored a name that was never displayed. Names now appear in
+  access and denial messages through `{container}`, alongside `{owner}`.
+- **Bedrock message adaptation.** Not one message ever reached it, so Bedrock players got identical
+  text. It now runs for every message, and three bugs in it were fixed: it truncated at 100 characters
+  (shorter than several of the plugin's own messages), it re-resolved Floodgate on every call, and its
+  symbol list did not cover the characters the plugin actually uses.
 
-## New message keys
+### Limit fixes
 
-`container_type_chest`, `container_type_trapped_chest`, `container_type_copper_chest`,
-`container_type_barrel`, `container_type_shulker_box`, `container_type_crafter`,
-`container_type_other`.
+- **A limit permission now beats the default.** `default-chest-limit` was applied first and the larger
+  of the two won, so `privatechest.limit.1` on a server with a default of 5 granted **5**. Permissions
+  below the default could not restrict anyone.
+- **Any number works.** Only eleven values were ever checked, so `privatechest.limit.7` silently did
+  nothing.
 
----
-
-## Features that were configurable but did nothing
-
-Three subsystems were fully written in 2.x and never connected to anything. If you had configured any
-of them, nothing happened.
-
-### Per-container-type limits now work
-
-The whole `container-limits` section of config.yml and every per-type permission node had no effect,
-because the code that read them was never called. Locking always used the overall limit.
-
-Both `/lockchest` and `[Private]` signs now go through one shared limit check, so the two can no longer
-disagree about what a player may lock.
-
-### Container names are now visible
-
-`/renamecontainer` stored a name that was never displayed anywhere, so naming a container had no
-observable effect. Names now appear in the access and denial messages, and these keys accept
-`{container}` and `{owner}`:
-
-```
-not_your_chest, owner_access_notice, admin_access_notice, trusted_access_notice,
-chest_break_warning, admin_chest_break_notice, locked, sign_chest_locked, limit_status
-```
-
-`{container}` is the custom name if the container has one, and the container type name otherwise. The
-default wording was updated to use them, for example `not_your_chest` now reads
-"This chest belongs to Steve" instead of a generic refusal.
-
-### Bedrock message adaptation now runs
-
-The whole Bedrock adaptation layer was dead code: not one message ever went through it, so Bedrock
-players received exactly the same text as Java players. Every message the plugin sends now passes
-through it.
-
-Three bugs had to be fixed to make it usable:
-
-- It truncated messages at 100 characters. Several of the plugin's own messages are longer than that
-  once a prefix and a placeholder are filled in, so switching it on as written would have cut them off
-  mid-sentence. Long messages are wrapped at word boundaries now, carrying the colour onto each line.
-- Floodgate was consulted through fresh reflection on every call. It is resolved once at startup.
-- Symbol replacements were extended to cover the characters the plugin's own default messages use, so
-  Bedrock players stop seeing missing-glyph boxes.
-
-On a server with no Bedrock bridge installed, the whole path is skipped after a single check.
-
-**Not included: Floodgate forms.** A native input form for entering passwords would be a real
-improvement for Bedrock players, and it is not in this release. Building it needs the Cumulus API, which
-I could not add as a build dependency in this environment, and I was not willing to ship unverifiable
-reflection into a protection plugin. Bedrock players can use every feature today by typing the commands,
-and `[Private]` signs need no command at all.
+Limits and permissions now key off a container *family*: `chest`, `trapped_chest`, `copper_chest`,
+`barrel`, `shulker_box`, `crafter`, `other`. A per-material limit can never work for a container whose
+material changes on its own.
 
 ---
 
-## Limit fixes
+## Commands
 
-### A limit permission now beats the default
+`/privatechest` gained real subcommands, all under `privatechest.admin`:
 
-`default-chest-limit` was applied first and then the larger of the two was taken, so a player granted
-`privatechest.limit.1` on a server with a default of 5 was given **5**. Any permission below the default
-could not restrict anyone, which is the opposite of what those nodes are for.
+| Command | Description |
+|:---|:---|
+| `reload` | Reload configuration and messages |
+| `status` | Backend in use, protected containers, trust relations, protectable types, unsaved changes |
+| `save` | Write pending changes now |
+| `migrate <yaml\|sqlite>` | Move all data to the other backend and switch live |
 
-A limit permission now always wins. The default applies only to players who have none.
+`migrate` was documented in 2.x `config.yml` but did not exist. It updates `storage-type` for you
+without stripping your comments, and leaves the old files as a backup. If it fails at any point the
+current backend stays in use, untouched.
 
-### Any number works in a limit permission
+### Tab completion
 
-Only eleven specific values were ever checked (1, 3, 5, 10, 15, 20, 25, 50, 100, 500, 1000), so
-`privatechest.limit.7` silently did nothing. The player's actual permissions are read now, so any number
-works, and the most generous one wins.
+Every command and subcommand completes, filtered by permission: a player who cannot run something is
+offered nothing for it.
+
+- **Passwords are never suggested.** A command with no completer falls back to the server default, which
+  suggests player names, so 2.x offered your players' names as password candidates.
+- **Vanish is respected.** Players you cannot see are not listed.
+- `/untrust` suggests only the players you actually trusted; `/trust` leaves out those you already have.
+
+### Smaller fixes
+
+- Breaking your own `[Private]` sign said it was an admin action, because ownership was checked after
+  the record had already been removed.
+- `/lockchest` and `/unlockchest` used a hardcoded English message from console.
+- Unresolvable player names in `/trust list` use a message key instead of a hardcoded word.
+- A missing message key is logged with its name and shown as `[key_name]`, instead of English prose.
 
 ---
 
 ## Cleanup no longer deletes trust lists
 
-2.x deleted a player's entire trusted list on every cleanup pass if they owned no containers at that
-moment. That quietly destroyed real data: a player who ran `/trust` before locking their first container
-lost the list within half an hour, and so did anyone who temporarily broke all of their containers.
-
-This is now **off by default** and has to be asked for:
-
-```yaml
-auto-cleanup:
-  remove-unused-trust: false
-```
-
-The rest of the cleanup is configurable for the first time, rather than fixed in code:
+2.x wiped a player's entire trusted list on every pass if they owned no containers at that moment. A
+player who ran `/trust` before locking their first container lost it within half an hour, and so did
+anyone who temporarily broke all their containers. Now off by default, and the rest is configurable
+instead of fixed in code:
 
 ```yaml
 auto-cleanup:
   startup-enabled: true
-  startup-delay-seconds: 10     # give world managers time to mount worlds
+  startup-delay-seconds: 10     # let world managers mount their worlds
   periodic-enabled: true
-  interval-minutes: 30          # 0 disables periodic passes
-  max-chunks-per-pass: 200      # spread a large dataset over several passes
-  chunks-per-tick: 20           # gentler on single-threaded servers
+  interval-minutes: 30          # 0 disables
+  max-chunks-per-pass: 200
+  chunks-per-tick: 20
+  remove-unused-trust: false
 ```
 
----
-
-## Other fixes
-
-- Missing message keys are now reported in the console with the key name and shown to the player as
-  `[key_name]`, instead of the literal text "Message not found: key". An admin can actually act on that.
-- `/privatechest status` also reports how many container types are protectable on your server.
-- Two message keys that could never be reached were removed: `limit_error` and `sign_not_your_chest`.
-  The second was unreachable in 2.x as well, because the check above it always returned first.
+Positions in unloaded chunks are never touched, on any setting.
 
 ---
+
+## Translation
+
+**Nothing shown to a player is hardcoded.** These were baked into the code: the `[Private]` sign tag,
+container type names, "Unlimited", the hopper/dropper/dispenser names, the console-only refusal, the
+forbidden container names, and the missing-key placeholder.
+
+```yaml
+# messages.yml
+sign_tag: "[Private]"
+sign_tag_aliases: ["[Private]", "[Privado]"]
+sign_tag_locked: "&4[&cPrivate&4]"
+```
+
+Tag matching ignores case, colour codes and spaces. The aliases list lets you change language without
+invalidating signs your players already placed.
+
+**Accented characters work in container names.** The rule was `a-zA-Z0-9`, which rejected every accent,
+so players on a Spanish, French, German or Portuguese server could not use their own language. The
+default is now Unicode-aware and the whole rule is configurable, along with the forbidden word list.
+
+**English and Spanish are bundled**, in `plugins/PrivateChest/lang/`:
+
+```yaml
+language: en              # which translation seeds messages.yml and supplies new keys
+use-player-locale: false  # or match each player by their Minecraft language
+```
+
+Previously an update always injected English into a translated file. With `use-player-locale`, missing
+entries fall back to `messages.yml`, so a partial translation is safe. Copy a file in `lang/` to add a
+language.
+
+Nothing changes for a single-language server: `messages.yml` is still your file and your edits stand.
+
+---
+
+## Known gap: copper golems
+
+Copper golems (1.21.9+) carry items out of copper chests on their own. If your server reports that as a
+normal item transfer, existing protection already blocks it, since transfers involving a protected
+container are cancelled whatever starts them. If it is implemented purely as mob behaviour, there is no
+event to intercept and no plugin can stop it.
+
+This could not be verified, so it is not claimed as covered. Test it before relying on it.
+
+**Also not included:** a native Bedrock input form for passwords. Bedrock players use every feature by
+typing commands, and `[Private]` signs need no command at all.
+
+---
+
+## New configuration
+
+`security`, `containers`, `container-names`, `language`, `use-player-locale`, `save-interval-seconds`,
+and an expanded `auto-cleanup`. Every option is documented inline in `config.yml`.
 
 ## New message keys
 
-`limit_exceeded_type`, `sign_limit_exceeded_type`, `status_container_types`.
+Added automatically, your existing wording kept:
 
-Reworded defaults, which your existing files keep unless you delete the key: `locked`,
-`not_your_chest`, `sign_chest_locked`, `limit_exceeded`, `sign_limit_exceeded`, `limit_warning`,
-`limit_reached`, `limit_status`, `owner_access_notice`, `admin_access_notice`,
-`trusted_access_notice`, `chest_break_warning`, `admin_chest_break_notice`.
+```
+sign_tag, sign_tag_aliases, sign_tag_locked, unknown_player, limit_unlimited,
+container_generic_name, container_type_*, block_name_*, too_many_attempts,
+limit_exceeded_type, sign_limit_exceeded_type, clean_skipped_unloaded,
+cleanup_already_running, usage_privatechest, usage_migrate, migrate_*, save_*, status_*
+```
+
+Removed, because they could never be reached: `limit_error`, `sign_not_your_chest`.
+
+Reworded defaults, which your file keeps unless you delete the key: `locked`, `not_your_chest`,
+`sign_chest_locked`, the `limit_*` messages, and the access and break notices, all of which now support
+`{container}` and `{owner}`.
 
 ---
 
-## Still to come in 3.0
+## Compatibility
 
-Full translatability: the remaining hardcoded strings, a translatable `[Private]` sign tag, and
-per-language message files. Then documentation and tests.
+| | |
+|:---|:---|
+| Minecraft | 1.16.5 – 26.2 |
+| Java | 8 or newer |
+| Single-threaded | CraftBukkit, Spigot, Paper, Purpur, Pufferfish, forks |
+| Regionised | Folia, Luminol, LightingLuminol, LeafMC, Kaiiju, forks |
+| Cross-platform | Java and Bedrock, via Geyser and Floodgate |

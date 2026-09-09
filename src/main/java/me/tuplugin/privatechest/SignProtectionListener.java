@@ -27,12 +27,6 @@ import me.tuplugin.privatechest.util.SignCompat;
  */
 public class SignProtectionListener implements Listener {
 
-    /** The tag a player writes to lock a container. */
-    private static final String PRIVATE_SIGN_TEXT = "[Private]";
-
-    /** How the tag is rewritten once the container is locked. */
-    private static final String PRIVATE_SIGN_FORMATTED = "\u00A74[\u00A7cPrivate\u00A74]";
-
     private final PrivateChest plugin;
     private final ChestLocker chestLocker;
     private final LimitManager limitManager;
@@ -55,10 +49,7 @@ public class SignProtectionListener implements Listener {
         }
 
         String[] lines = event.getLines();
-        if (lines.length == 0 || lines[0] == null) {
-            return;
-        }
-        if (!SignCompat.stripFormatting(lines[0]).equals(SignCompat.stripFormatting(PRIVATE_SIGN_TEXT))) {
+        if (lines.length == 0 || lines[0] == null || !isPrivateTag(lines[0])) {
             return;
         }
 
@@ -66,7 +57,7 @@ public class SignProtectionListener implements Listener {
 
         // Sign protection has its own permission, so blocking /lockchest does not block signs.
         if (!player.hasPermission("privatechest.sign")) {
-            messages.send(player, messages.raw("no_permission"));
+            messages.sendRaw(player, "no_permission");
             event.setCancelled(true);
             return;
         }
@@ -75,7 +66,7 @@ public class SignProtectionListener implements Listener {
         Set<Block> chestBlocks = findNearbyChests(signBlock);
 
         if (chestBlocks.isEmpty()) {
-            messages.send(player, messages.get("sign_no_chest_found"));
+            messages.send(player, "sign_no_chest_found");
             event.setCancelled(true);
             return;
         }
@@ -85,7 +76,7 @@ public class SignProtectionListener implements Listener {
         Block firstChest = null;
         for (Block chestBlock : chestBlocks) {
             if (chestLocker.isChestLocked(chestBlock)) {
-                messages.send(player, messages.get("sign_chest_already_locked"));
+                messages.send(player, "sign_chest_already_locked");
                 event.setCancelled(true);
                 return;
             }
@@ -100,7 +91,7 @@ public class SignProtectionListener implements Listener {
             LimitManager.LimitCheck limitCheck =
                     limitManager.checkCanLock(player, firstChest.getType(), newChestsToLock);
             if (!limitCheck.isAllowed()) {
-                messages.send(player, limitManager.getSignDeniedMessage(limitCheck));
+                messages.sendText(player, limitManager.getSignDeniedMessage(limitCheck));
                 event.setCancelled(true);
                 return;
             }
@@ -116,12 +107,12 @@ public class SignProtectionListener implements Listener {
         }
 
         if (!anyLocked) {
-            messages.send(player, messages.get("sign_lock_failed"));
+            messages.send(player, "sign_lock_failed");
             event.setCancelled(true);
             return;
         }
 
-        event.setLine(0, PRIVATE_SIGN_FORMATTED);
+        event.setLine(0, messages.raw("sign_tag_locked"));
         event.setLine(1, player.getName());
         event.setLine(2, "");
         event.setLine(3, "");
@@ -130,18 +121,17 @@ public class SignProtectionListener implements Listener {
                 ? null
                 : plugin.getContainerRegistry().getFamily(firstChest.getType());
 
-        messages.send(player, messages.get("sign_chest_locked")
-                .replace("{container}", limitManager.familyName(family)));
+        messages.send(player, "sign_chest_locked", "container", limitManager.familyName(family));
 
         String warningMessage = limitManager.getLimitWarningMessage(player, family);
         if (warningMessage != null) {
-            messages.send(player, warningMessage);
+            messages.sendText(player, warningMessage);
         }
 
         if (limitManager.areLimitsEnabled() && !player.hasPermission("privatechest.admin")) {
-            messages.send(player, messages.get("limit_status")
-                    .replace("{status}", limitManager.getLimitStatus(player, family))
-                    .replace("{container}", limitManager.familyName(family)));
+            messages.send(player, "limit_status",
+                    "status", limitManager.getLimitStatus(player, family),
+                    "container", limitManager.familyName(family));
         }
     }
 
@@ -168,8 +158,7 @@ public class SignProtectionListener implements Listener {
 
         // Checks both sides of the sign. Signs have had a writable back since Minecraft 1.20, and
         // reading only the front meant a tag written on the back was invisible to the plugin.
-        if (!SignCompat.hasTag((Sign) state, PRIVATE_SIGN_TEXT)
-                && !SignCompat.hasTag((Sign) state, PRIVATE_SIGN_FORMATTED)) {
+        if (!hasPrivateTag((Sign) state)) {
             return;
         }
 
@@ -192,7 +181,7 @@ public class SignProtectionListener implements Listener {
 
         if (!chestLocker.isOwner(lockedChest, player) && !player.hasPermission("privatechest.admin")) {
             event.setCancelled(true);
-            messages.send(player, messages.get("sign_cannot_break"));
+            messages.send(player, "sign_cannot_break");
             return;
         }
 
@@ -204,9 +193,60 @@ public class SignProtectionListener implements Listener {
             chestLocker.removeProtection(chestBlock);
         }
 
-        messages.send(player, wasOwner
-                ? messages.get("sign_chest_unlocked")
-                : messages.get("admin_sign_break_notice"));
+        messages.send(player, wasOwner ? "sign_chest_unlocked" : "admin_sign_break_notice");
+    }
+
+    /**
+     * Every spelling of the tag that this server accepts.
+     *
+     * <p>Read from the message files, so the tag is part of the translation rather than a constant in
+     * the code. A Spanish server can use {@code [Privado]}. Aliases let a server change language
+     * without invalidating the signs its players already placed, and the locked form is included so an
+     * already-formatted sign is still recognised.</p>
+     */
+    private Set<String> acceptedTags() {
+        Set<String> tags = new HashSet<>();
+
+        addTag(tags, messages.rawOrNull("sign_tag"));
+        addTag(tags, messages.rawOrNull("sign_tag_locked"));
+        for (String alias : messages.rawList("sign_tag_aliases")) {
+            addTag(tags, alias);
+        }
+
+        // Never leave a server with no way to lock by sign, whatever the message file says.
+        if (tags.isEmpty()) {
+            addTag(tags, "[Private]");
+        }
+        return tags;
+    }
+
+    private void addTag(Set<String> tags, String tag) {
+        if (tag != null) {
+            String normalized = SignCompat.stripFormatting(tag);
+            if (!normalized.isEmpty()) {
+                tags.add(normalized);
+            }
+        }
+    }
+
+    /**
+     * Whether a line is the tag, ignoring case, colour codes and surrounding spaces.
+     */
+    private boolean isPrivateTag(String line) {
+        return acceptedTags().contains(SignCompat.stripFormatting(line));
+    }
+
+    /**
+     * Whether either side of a sign carries the tag.
+     */
+    private boolean hasPrivateTag(Sign sign) {
+        Set<String> tags = acceptedTags();
+        for (String line : SignCompat.getAllLines(sign)) {
+            if (tags.contains(SignCompat.stripFormatting(line))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

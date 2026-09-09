@@ -1,42 +1,121 @@
 # 🔐 PrivateChest
 
-PrivateChest is a lightweight and powerful plugin that allows players to lock their chests and barrels with a personal password.
-
-No complicated land-claim systems required — simple, secure, and optimized for survival servers!
+Lock your containers with a password. No land claims, no regions, no setup — place a sign or type one
+command and the container is yours.
 
 ---
 
-## ✨ Features
+## ✨ What it does
 
-- 🔒 Lock chests, barrels, and shulker boxes with a password.
-- 🔑 Unlock your own containers with the correct password.
-- 👤 Only the owner can access protected containers.
-- 💥 Protection against TNT, creeper, and explosion damages.
-- 📦 Support for double chests and all shulker box variants.
-- 🤝 Trust system - give other players access without sharing passwords.
-- 🔁 Reload configuration and messages live with `/privatechest reload`.
-- 🧹 Automatic cleanup of orphaned container data.
-- 🎨 Customizable prefix and full message control.
-- 🌐 Multilingual ready — translate easily via `messages.yml` and `config.yml`.
-- 📊 bStats integration to anonymously monitor plugin usage.
-- 🎮 Bedrock Edition support via Floodgate.
+- Lock chests, trapped chests, barrels, shulker boxes, crafters and copper chests
+- Lock by command or by writing a tag on a sign next to the container
+- Trust other players so they can use your containers without knowing your password
+- Give containers custom names
+- Protection against breaking, explosions, fire, pistons, mobs and hoppers
+- Per-player container limits by permission, overall or per container type
+- YAML or SQLite storage, switchable at runtime
+- Translatable end to end, with English and Spanish included
+
+---
+
+## ✅ Compatibility
+
+### Minecraft
+
+**1.16.5 through 26.2.** One jar for all of them.
+
+Everything version-specific is resolved when the server starts, so newer containers and newer sign
+features are used when they exist and skipped quietly when they do not.
+
+| Feature | Requires |
+|:---|:---|
+| Chests, trapped chests, barrels, shulker boxes | 1.16.5+ |
+| Reading both sides of a sign | 1.20+ |
+| Crafters | 1.21+ |
+| Copper chests, all oxidation and waxed stages | 1.21.9+ |
+| Containers added after this release | Automatic, see `containers.auto-discover` |
+
+### Server software
+
+**Single-threaded:** CraftBukkit, Spigot, Paper, Purpur, Pufferfish, and forks.
+
+**Regionised:** Folia, Luminol, LightingLuminol, LeafMC, Kaiiju, and forks.
+
+Folia support is real, not just a `plugin.yml` flag. Anything that reads or writes a block runs on the
+thread that owns that chunk, and background work uses the async scheduler. The detected software is
+printed on the startup line.
+
+### Java
+
+Java 8 or newer. The jar is built for Java 8 so it also loads on the older servers listed above.
+
+### Bedrock Edition
+
+Bedrock players can use every feature, through Geyser and Floodgate. Messages are adapted for
+Bedrock's chat: formatting it ignores is stripped, symbols with no glyph are replaced, and long lines
+are wrapped instead of cut off.
+
+Sign-based locking is the easiest route for Bedrock players, because it needs no command typing.
+
+**Not included:** a native Bedrock input form for entering passwords. Commands work by typing them.
 
 ---
 
 ## 📜 Commands
 
+### Players
+
 | Command | Description | Permission |
 |:---|:---|:---|
-| `/lockchest <password>` | Lock the chest you are looking at. | `privatechest.lock` |
-| `/unlockchest <password>` | Unlock your locked chest. | `privatechest.unlock` |
-| `/trust <player>` | Give another player access to your locked containers. | `privatechest.trust` |
-| `/trust list` | List all players you have trusted. | `privatechest.trust` |
-| `/untrust <player>` | Remove access from a player. | `privatechest.untrust` |
-| `/untrust all` | Remove access from all trusted players. | `privatechest.untrust` |
-| `/renamecontainer <name>` | Set a custom name for a protected container. | `privatechest.rename` |
-| `/renamecontainer remove` | Remove the custom name from a container. | `privatechest.rename` |
-| `/privatechest reload` | Reload config and messages without restart. | `privatechest.admin` |
-| `/clearchests` | Remove orphaned chest entries from data.yml. | `privatechest.admin` |
+| `/lockchest <password>` | Lock the container you are looking at | `privatechest.lock` |
+| `/unlockchest <password>` | Remove your protection from a container | `privatechest.unlock` |
+| `/trust <player>` | Let a player use your protected containers | `privatechest.trust` |
+| `/trust list` | List the players you have trusted | `privatechest.trust` |
+| `/untrust <player>` | Revoke a player's access | `privatechest.untrust` |
+| `/untrust all` | Revoke everyone's access | `privatechest.untrust` |
+| `/renamecontainer <name>` | Name a container you own | `privatechest.rename` |
+| `/renamecontainer remove` | Clear the name (`clear` and `delete` also work) | `privatechest.rename` |
+
+### Admins
+
+| Command | Description |
+|:---|:---|
+| `/privatechest reload` | Reload `config.yml` and the message files |
+| `/privatechest status` | Storage backend, protected container count, trust count, protectable types, unsaved changes |
+| `/privatechest save` | Write all pending changes to disk now |
+| `/privatechest migrate <yaml\|sqlite>` | Move all data to the other backend and switch to it |
+| `/clearchests` | Remove records whose container no longer exists |
+
+All admin commands require `privatechest.admin`.
+
+Aliases: `/pc` for `/privatechest`, and `/renamechest` for `/renamecontainer`.
+
+Every command has tab completion, and it respects permissions: a player who cannot run a command is
+offered nothing for it. Passwords are never suggested.
+
+---
+
+## 🪧 Sign protection
+
+Write the tag on a sign placed on, above or next to a container and it locks. Break the sign and it
+unlocks.
+
+The tag is part of the translation, not a fixed English word. In `messages.yml`:
+
+```yaml
+sign_tag: "[Private]"
+sign_tag_aliases:
+  - "[Private]"
+  - "[Privado]"
+sign_tag_locked: "&4[&cPrivate&4]"
+```
+
+Matching ignores case, colour codes and surrounding spaces. The aliases list lets you change your
+server's language without invalidating signs your players already placed. Both sides of the sign are
+read on Minecraft 1.20 and newer.
+
+Sign protection uses its own permission, `privatechest.sign`, so you can block `/lockchest` and still
+allow signs, or the other way round.
 
 ---
 
@@ -44,95 +123,193 @@ No complicated land-claim systems required — simple, secure, and optimized for
 
 | Permission | Description | Default |
 |:---|:---|:---|
-| `privatechest.use` | Parent permission — grants all player commands below. | `true` |
-| `privatechest.lock` | Allows using `/lockchest`. | `true` |
-| `privatechest.unlock` | Allows using `/unlockchest`. | `true` |
-| `privatechest.trust` | Allows using `/trust`. | `true` |
-| `privatechest.untrust` | Allows using `/untrust`. | `true` |
-| `privatechest.rename` | Allows using `/renamecontainer`. | `true` |
-| `privatechest.sign` | Allows locking containers via `[Private]` signs. | `true` |
-| `privatechest.admin` | Admin commands and bypass protection. | `op` |
+| `privatechest.use` | Parent permission, grants everything below | `true` |
+| `privatechest.lock` | `/lockchest` | `true` |
+| `privatechest.unlock` | `/unlockchest` | `true` |
+| `privatechest.trust` | `/trust` | `true` |
+| `privatechest.untrust` | `/untrust` | `true` |
+| `privatechest.rename` | `/renamecontainer` | `true` |
+| `privatechest.sign` | Locking with a sign | `true` |
+| `privatechest.admin` | Admin commands and bypassing protection | `op` |
 
-> **Tip:** To block only the `/lockchest` command while keeping sign-based protection, negate `privatechest.lock` in your permissions plugin. Signs use `privatechest.sign` independently.
+> To block one command, negate its permission in your permissions plugin. The rest keep working.
+
+### Limit permissions
+
+Only used when `enable-chest-limits: true`.
+
+| Permission | Meaning |
+|:---|:---|
+| `privatechest.limit.unlimited` | No limit at all |
+| `privatechest.limit.<number>` | Overall limit, any number |
+| `privatechest.limit.<family>.<number>` | Limit for one container type |
+| `privatechest.limit.<family>.unlimited` | No limit for one container type |
+
+Families: `chest`, `trapped_chest`, `copper_chest`, `barrel`, `shulker_box`, `crafter`, `other`.
+
+Any number works, not just the examples registered in `plugin.yml`. The most generous permission a
+player has wins, and a permission always overrides `default-chest-limit`.
+
+Per-family limits need `container-limits.enabled: true`. All shulker box colours count as one family,
+and every copper chest oxidation stage counts as one family, so a player's count does not shift when
+their copper chests weather.
 
 ---
 
 ## ⚙️ Configuration
 
-### config.yml
+`config.yml` documents every option inline. The main sections:
+
+| Section | What it controls |
+|:---|:---|
+| `storage-type`, `save-interval-seconds` | Which backend, and how often pending changes are written |
+| `language`, `use-player-locale` | Which translation, and whether each player gets their own |
+| `container-names` | Length, allowed characters and forbidden words for `/renamecontainer` |
+| `containers` | Which blocks can be protected, including auto-discovery of new ones |
+| `container-limits` | Per-container-type limits |
+| `security` | Password hashing strength and wrong-attempt rate limiting |
+| `auto-cleanup` | When and how hard the orphaned-record cleanup runs |
+| `hopper-protection` | Whether hoppers may reach locked containers |
+| `notify-*-on-open` | The small notices shown when a container is opened |
+
+### Storage
 
 ```yaml
+storage-type: yaml          # or sqlite
+save-interval-seconds: 5
+```
 
+Changes are collected in memory and written by a background thread on that interval, so locking a
+container never stalls the server. A clean shutdown always writes everything. A hard crash can lose at
+most `save-interval-seconds` of changes, and `/privatechest save` forces a write at any time.
 
-use-prefix: true
-prefix: "&7[&6PrivateChest&7] "
-notify-owner-on-open: true
+`/privatechest migrate` moves your data between backends live, updates `storage-type` for you, and
+leaves the old files in place as a backup.
 
-messages.yml
-Easily edit all plugin messages to your preferred language!
+### Protectable containers
 
-## ✅ Compatibility
+```yaml
+containers:
+  auto-discover: true
+  discovery-patterns: ["*_CHEST", "*_SHULKER_BOX"]
+  additional: []                 # e.g. FURNACE, BLAST_FURNACE, SMOKER, BREWING_STAND
+  excluded: ["ENDER_CHEST"]
+  disabled: []
+```
 
-### Minecraft Versions
-**Supported:** 1.16.5 → 1.21.x
+With `auto-discover` on, a container added by a future Minecraft update is protectable the day it
+ships. `disabled` stops new locks on a type without touching protections players already have.
 
-### Server Software
+### Security
 
-**Standard (Single-threaded):**
-- CraftBukkit
-- Spigot
-- Paper
-- Purpur
-- Pufferfish
-- Any Spigot/Paper fork
+```yaml
+security:
+  password-hash-iterations: 20000
+  max-password-attempts: 5
+  attempt-window-seconds: 60
+  lockout-seconds: 300
+  log-failed-attempts: true
+```
 
-**Regionized (Multi-threaded):**
-- Folia
-- Luminol
-- LightingLuminol
-- LeafMC
-- Kaiiju
-- Any Folia-based fork
-
-### Cross-Platform (Java + Bedrock)
-- Geyser (standalone or plugin)
-- Floodgate (for authentication)
-- Full support for Bedrock Edition players
-
-📊 Plugin Statistics
-View usage data at:
-🔗 bStats - PrivateChest
+Passwords are stored as PBKDF2-HMAC-SHA256 with a random salt. Older formats are read and rewritten
+automatically the first time a password is entered correctly, so raising the iteration count
+strengthens existing passwords with no migration step.
 
 ---
 
-## 🧩 Public API (Since v1.4)
+## 🌐 Translation
 
-PrivateChest now offers a simple and safe API for developers to integrate with protected chests and barrels.
+English and Spanish ship with the plugin, in `plugins/PrivateChest/lang/`.
 
-**Example usage:**
+```yaml
+language: en
+use-player-locale: false
+```
+
+- `language` picks the translation used to create `messages.yml` on first start, and the language new
+  keys arrive in when an update adds them.
+- `use-player-locale: true` loads every `lang/*.yml` and matches each player by their Minecraft
+  language setting, falling back to `messages.yml` for anything a translation is missing. A partial
+  translation is safe to use.
+
+`messages.yml` is your active, editable file. Nothing overwrites your wording.
+
+To add a language, copy a file in `lang/` to `lang/<code>.yml` and translate the values. Nothing shown
+to a player is hardcoded, including the sign tag and the container type names.
+
+---
+
+## 🛡️ What is protected
+
+| Against | Covered |
+|:---|:---|
+| Opening by another player | Yes, including any route other than right-clicking |
+| Breaking the container | Yes. Trusted players can use a container but not destroy it |
+| TNT, creepers and other explosions | Yes, both halves of a double chest |
+| Fire | Yes |
+| Mobs changing the block | Yes |
+| Pistons moving the container | Yes. Barrels and shulker boxes are pushable, so this matters |
+| Hoppers, droppers, dispensers | Yes, configurable |
+| Hopper minecarts | Yes |
+| Placing a hopper against someone else's container | Yes |
+
+**Known gap:** copper golems (Minecraft 1.21.9+) carry items out of copper chests on their own. If your
+server reports that as a normal item transfer, existing protection already blocks it. If it is
+implemented purely as mob behaviour, no plugin can intercept it. Test it on your setup before relying
+on it.
+
+---
+
+## 📊 Statistics
+
+bStats collects anonymous usage data: https://bstats.org/plugin/bukkit/PrivateChest/25606
+
+---
+
+## 🧩 Developer API
 
 ```java
 import me.tuplugin.privatechest.api.PrivateChestAPI;
 
-// Check if a block is locked
-boolean isLocked = PrivateChestAPI.isLocked(block);
+// Is this block protected?
+boolean locked = PrivateChestAPI.isLocked(block);
 
-// Check if a player owns a block
-boolean isOwner = PrivateChestAPI.isOwner(block, player);
+// Does this player own it?
+boolean owner = PrivateChestAPI.isOwner(block, player);
 
-// Lock a chest manually
-PrivateChestAPI.lockBlock(block, player, "mypassword");
-
-// Unlock a chest manually
-PrivateChestAPI.unlockBlock(block);
-
-// Get the owner of a locked chest
+// Who owns it?
 UUID owner = PrivateChestAPI.getOwner(block);
 
+// Lock and unlock. Both persist automatically.
+PrivateChestAPI.lockBlock(block, player, "password");
+PrivateChestAPI.unlockBlock(block);
 
-📜 License
-PrivateChest is distributed under the MIT License.
-See LICENSE for more information.
+// Can this material be protected on this server?
+boolean lockable = PrivateChestAPI.isLockableContainer(Material.BARREL);
 
-🎮 Thanks for using PrivateChest!
-If you enjoy the plugin, leave a star ⭐ on GitHub and a rating on SpigotMC!
+// How many containers are protected in total?
+int count = PrivateChestAPI.getLockedChestCount();
+```
+
+`isLockableContainer` answers from the server's live container list, so it reflects your
+`containers` configuration.
+
+---
+
+## 📦 Building
+
+```bash
+mvn clean package
+```
+
+The jar lands in `target/PrivateChest-<version>.jar`. bStats is shaded and relocated.
+
+---
+
+## 📄 License
+
+MIT. See [LICENSE](LICENSE).
+
+---
+
+Thanks for using PrivateChest. A star on GitHub or a rating on SpigotMC is always appreciated.

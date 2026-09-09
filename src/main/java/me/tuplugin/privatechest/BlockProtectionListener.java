@@ -68,13 +68,10 @@ public class BlockProtectionListener implements Listener {
             return;
         }
 
-        String message = access == AccessGuard.Access.OWNER
-                ? messages.get("chest_break_warning")
-                : messages.get("admin_chest_break_notice");
-
-        messages.send(player, message
-                .replace("{container}", accessGuard.describe(protection))
-                .replace("{owner}", accessGuard.ownerName(protection)));
+        messages.send(player,
+                access == AccessGuard.Access.OWNER ? "chest_break_warning" : "admin_chest_break_notice",
+                "container", accessGuard.describe(protection),
+                "owner", accessGuard.ownerName(protection));
 
         // Only the record at the broken position is cleared. The other half of a double chest keeps
         // its own protection, instead of being silently unlocked along with it.

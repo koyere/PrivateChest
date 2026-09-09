@@ -28,17 +28,38 @@ public final class FileUtil {
      * by a plugin update while leaving existing values alone.
      */
     public static void updateConfig(JavaPlugin plugin, String fileName) {
+        updateConfigFrom(plugin, fileName, fileName);
+    }
+
+    /**
+     * Adds keys introduced by an update, taking the defaults from a specific bundled resource.
+     *
+     * <p>Used for messages.yml, whose defaults come from the language selected in config.yml rather
+     * than from a file of the same name. Without this, a server running in Spanish would have English
+     * text injected every time an update added a message.</p>
+     *
+     * @param fileName     the file in the plugin folder
+     * @param resourcePath the bundled resource to take defaults from
+     */
+    public static void updateConfigFrom(JavaPlugin plugin, String fileName, String resourcePath) {
         try {
             File file = new File(plugin.getDataFolder(), fileName);
-            if (!file.exists()) {
-                plugin.saveResource(fileName, false);
+
+            InputStream bundled = plugin.getResource(resourcePath);
+            if (bundled == null) {
+                plugin.getLogger().warning("Bundled " + resourcePath + " is missing from the plugin jar; "
+                        + "cannot check " + fileName + " for new entries.");
                 return;
             }
 
-            InputStream bundled = plugin.getResource(fileName);
-            if (bundled == null) {
-                plugin.getLogger().warning("Bundled " + fileName + " is missing from the plugin jar; "
-                        + "cannot check it for new options.");
+            if (!file.exists()) {
+                if (resourcePath.equals(fileName)) {
+                    plugin.saveResource(resourcePath, false);
+                } else {
+                    // The bundled resource has a different name, so copy it rather than letting
+                    // saveResource write it to its own path.
+                    java.nio.file.Files.copy(bundled, file.toPath());
+                }
                 return;
             }
 
@@ -59,10 +80,10 @@ public final class FileUtil {
 
             if (added > 0) {
                 existingConfig.save(file);
-                plugin.getLogger().info("Added " + added + " new option(s) to " + fileName + ".");
+                plugin.getLogger().info("Added " + added + " new entry(ies) to " + fileName + ".");
             }
         } catch (Exception e) {
-            plugin.getLogger().warning("Could not check " + fileName + " for new options: " + e.getMessage());
+            plugin.getLogger().warning("Could not check " + fileName + " for new entries: " + e.getMessage());
         }
     }
 

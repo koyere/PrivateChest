@@ -1,0 +1,205 @@
+# -------------------------------------------------- #
+#           PrivateChest Messages - English          #
+# -------------------------------------------------- #
+#
+# There are two places this file can live, and it behaves differently in each:
+#
+#   messages.yml   Your active file. This is what the plugin reads and what you edit.
+#                  It was created from the language set in config.yml. Nothing overwrites your
+#                  wording; updates only append keys that did not exist yet.
+#
+#   lang/en.yml    A read-only template. Used to create messages.yml the first time, to supply new
+#                  keys in the right language after an update, and to serve this language to players
+#                  directly when 'use-player-locale' is enabled.
+#
+# To add a language, copy this file to lang/<code>.yml and translate the values. Then either set
+# 'language' in config.yml, or turn on 'use-player-locale' to give each player their own.
+#
+# Use & colour codes. Placeholders in {braces} are filled in by the plugin.
+#
+
+# --- General errors and permissions ---
+
+# Sent when a player lacks the necessary permission.
+no_permission: "&cYou do not have permission to use this command."
+# Sent when the console runs a command that only a player can use.
+console_only_player: "&cThis command can only be used by players."
+# Sent when the player is not looking at a container that can be protected.
+not_a_chest: "&cYou must be looking at a container to use this command."
+# Sent when the container is not locked.
+not_locked: "&eThis container is not locked."
+# Sent when a player tries to use a container they have no access to.
+# Supports {container} and {owner}.
+not_your_chest: "&cThis {container} belongs to {owner}."
+# Generic error for unexpected issues.
+error_generic: "&cAn unexpected error occurred. Please contact an administrator."
+# Used in place of a player name when a stored UUID cannot be resolved to one.
+unknown_player: "Unknown"
+
+# --- /lockchest ---
+
+usage_lock: "&cUsage: /lockchest <password>"
+# {container} is the container type name.
+locked: "&aThis {container} has been locked."
+already_locked: "&eThis container is already locked."
+
+# --- /unlockchest ---
+
+usage_unlock: "&cUsage: /unlockchest <password>"
+unlocked: "&aContainer unlocked."
+wrong_password: "&cIncorrect password. Access denied."
+# Sent when a player has entered too many wrong passwords and must wait.
+# Limits are configured under 'security' in config.yml.
+too_many_attempts: "&cToo many incorrect passwords. Try again in {seconds} second(s)."
+
+# --- /trust and /untrust ---
+
+usage_trust: "&cUsage: /trust <player> or /trust list"
+usage_untrust: "&cUsage: /untrust <player> or /untrust all"
+player_not_found: "&cPlayer '{player}' is not online."
+cannot_trust_yourself: "&cYou cannot trust yourself."
+player_trusted: "&aYou have trusted &e{player}&a. They can now use your locked containers."
+trusted_by_player: "&a&l{player} &ahas given you access to their locked containers."
+player_already_trusted: "&e{player} is already trusted."
+player_untrusted: "&cYou have removed trust from &e{player}&c. They can no longer use your locked containers."
+untrusted_by_player: "&c&l{player} &chas removed your access to their locked containers."
+player_not_trusted: "&e{player} is not in your trusted list."
+no_trusted_players: "&eYou have not trusted anyone yet."
+all_players_untrusted: "&cRemoved trust from {count} player(s)."
+untrust_all_failed: "&cCould not remove trust from those players."
+
+# --- Trust list display ---
+
+trusted_players_header: "&6=== &eTrusted players &6==="
+trusted_player_entry: "&7- &e{player} &7({status})"
+trusted_players_footer: "&6=== &eTotal: {count} &6==="
+player_status_online: "&aonline"
+player_status_offline: "&7offline"
+
+# --- Container limits ---
+#
+# {container} is the container type name, for example "shulker box". It is only meaningful when
+# per-family limits are on (container-limits.enabled in config.yml); with the overall limit it falls
+# back to a generic word.
+
+limit_exceeded: "&cYou cannot lock any more containers. Using {current}/{limit}, trying to lock {trying} more."
+limit_exceeded_type: "&cYou cannot lock any more of that container type. Using {current}/{limit} {container}, trying to lock {trying} more."
+sign_limit_exceeded: "&cThis private sign would take you past your limit. Using {current}/{limit}, it would lock {trying} more."
+sign_limit_exceeded_type: "&cThis private sign would take you past your limit for that container type. Using {current}/{limit} {container}, it would lock {trying} more."
+limit_warning: "&eYou have {remaining} of {limit} locks remaining."
+limit_reached: "&cYou have reached your limit of {limit}."
+limit_status: "&7Locks used: {status}"
+# Shown instead of a number when a player has no limit.
+limit_unlimited: "Unlimited"
+
+# --- Sign protection ---
+#
+# The tag is the text a player writes on a sign to lock the container next to it. Translate it freely.
+# Comparison ignores case, colour codes and surrounding spaces.
+
+# The tag for this language.
+sign_tag: "[Private]"
+# Other spellings that are also accepted, so a server can switch language without breaking existing
+# signs, or accept more than one wording at once.
+sign_tag_aliases:
+  - "[Private]"
+  - "[Privado]"
+# What the first line becomes once the container is locked.
+sign_tag_locked: "&4[&cPrivate&4]"
+
+sign_no_chest_found: "&cNo container found next to this sign. Place the sign on or beside one."
+sign_chest_already_locked: "&cThis container is already locked."
+# {container} is the container type name.
+sign_chest_locked: "&aThis {container} is now locked with a private sign."
+sign_lock_failed: "&cCould not lock the container with this sign."
+sign_cannot_break: "&cYou cannot break this private sign."
+sign_chest_unlocked: "&aContainer unlocked by removing its private sign."
+admin_sign_break_notice: "&e(Admin) You broke a private sign and unlocked the container."
+
+# --- /clearchests ---
+
+cleaning_start: "&eLooking for orphaned container records..."
+cleaned_chests: "&a\u2714 Removed {amount} orphaned container record(s)."
+no_chests_to_clean: "&aNo orphaned container records found."
+# Records in chunks that are not loaded are left alone on purpose: an unloaded chunk is not evidence
+# that a container is gone.
+clean_skipped_unloaded: "&7{amount} record(s) skipped because their chunks are not loaded."
+cleanup_already_running: "&eA cleanup is already running. Try again in a moment."
+
+# --- /privatechest ---
+
+usage_privatechest: "&eUsage: /privatechest <reload|status|save|migrate>"
+reload_success: "&a\u2714 Configuration and messages reloaded."
+
+# --- /privatechest status ---
+
+status_header: "&6=== &ePrivateChest status &6==="
+status_storage: "&7Storage backend: &f{type}"
+status_containers: "&7Protected containers: &f{amount}"
+status_trust: "&7Trust relations: &f{amount}"
+status_container_types: "&7Protectable container types: &f{amount}"
+status_pending: "&7Unsaved changes: &f{state}"
+status_pending_yes: "&eyes"
+status_pending_no: "&anone"
+
+# --- /privatechest save ---
+
+save_success: "&a\u2714 All pending changes have been written to disk."
+save_failed: "&cCould not write pending changes. See the console for details."
+
+# --- /privatechest migrate ---
+
+usage_migrate: "&eUsage: /privatechest migrate <yaml|sqlite>"
+migrate_started: "&eMigrating storage to {type}. This may take a moment..."
+migrate_success: "&a\u2714 Storage migrated to {type}. The previous data files were kept as a backup."
+migrate_already_active: "&e{type} is already the active storage backend."
+migrate_failed: "&cMigration failed. The current storage backend is unchanged. See the console for details."
+
+# --- Automated block protection ---
+
+automated_block_placement_denied: "&cYou cannot place {block} next to a container you do not have access to."
+
+# Names used for {block} above.
+block_name_hopper: "a hopper"
+block_name_dropper: "a dropper"
+block_name_dispenser: "a dispenser"
+
+# --- /renamecontainer ---
+
+usage_rename_container: "&eUsage: /renamecontainer <name> or /renamecontainer remove"
+container_name_set: "&aContainer renamed to '&f{name}&a'."
+container_name_removed: "&aCustom name removed from the {container}."
+container_not_protected: "&cThis container is not protected."
+container_not_owned: "&cYou can only rename containers you own."
+container_no_custom_name: "&cThis container has no custom name to remove."
+name_empty: "&cThe name cannot be empty."
+name_too_short: "&cThe name must be at least {details} character(s) long."
+name_too_long: "&cThe name cannot be longer than {details} characters."
+name_invalid_characters: "&cThat name contains characters that are not allowed."
+name_forbidden: "&cThat name is not allowed."
+# Used for {container} when the container type cannot be determined.
+container_generic_name: "container"
+
+# --- Container type names ---
+#
+# Shown for {container} when a container has no custom name. Grouped by family: all shulker box
+# colours share one name, and every oxidation stage of a copper chest shares one name.
+
+container_type_chest: "chest"
+container_type_trapped_chest: "trapped chest"
+container_type_copper_chest: "copper chest"
+container_type_barrel: "barrel"
+container_type_shulker_box: "shulker box"
+container_type_crafter: "crafter"
+container_type_other: "container"
+
+# --- Access notices ---
+#
+# These support {container} and {owner}. {container} is the container's custom name if it has one,
+# set with /renamecontainer, and the container type name otherwise.
+
+owner_access_notice: "&7(Your {container})"
+admin_access_notice: "&6(Admin access to {owner}'s {container})"
+trusted_access_notice: "&b(Trusted access to {owner}'s {container})"
+chest_break_warning: "&eYou broke your locked {container}."
+admin_chest_break_notice: "&e(Admin) You broke {owner}'s protected {container}."

@@ -3,6 +3,7 @@ package me.tuplugin.privatechest.commands;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -16,58 +17,55 @@ import me.tuplugin.privatechest.PrivateChest;
 import me.tuplugin.privatechest.TrustManager;
 import me.tuplugin.privatechest.util.TabUtils;
 
+/**
+ * Revokes another player's access to the sender's protected containers.
+ */
 public class UntrustCommand implements CommandExecutor, TabCompleter {
 
-    private final PrivateChest plugin;
     private final TrustManager trustManager;
     private final MessageManager messages;
 
     public UntrustCommand(PrivateChest plugin) {
-        this.plugin = plugin;
-        this.trustManager = TrustManager.getInstance();
+        this.trustManager = plugin.getTrustManager();
         this.messages = plugin.getMessageManager();
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player)) {
-            messages.send(sender, messages.raw("console_only_player"));
+            messages.sendRaw(sender, "console_only_player");
             return true;
         }
 
         Player player = (Player) sender;
 
         if (!player.hasPermission("privatechest.untrust")) {
-            messages.send(player, messages.raw("no_permission"));
+            messages.sendRaw(player, "no_permission");
             return true;
         }
 
         if (args.length == 0) {
-            messages.send(player, messages.raw("usage_untrust"));
+            messages.sendRaw(player, "usage_untrust");
             return true;
         }
 
         String targetPlayerName = args[0];
 
-        // Handle special case for removing all trusted players
         if (targetPlayerName.equalsIgnoreCase("all")) {
             untrustAllPlayers(player);
             return true;
         }
 
-        // Find target player (online or offline)
         Player targetPlayer = Bukkit.getPlayer(targetPlayerName);
         String targetUUID = null;
         String actualPlayerName = targetPlayerName;
 
         if (targetPlayer != null) {
-            // Player is online
             targetUUID = targetPlayer.getUniqueId().toString();
             actualPlayerName = targetPlayer.getName();
         } else {
-            // Try to find offline player by checking current trusted list
-            Set<String> trustedUUIDs = trustManager.getTrustedPlayers(player);
-            for (String uuid : trustedUUIDs) {
+            // Offline: match against the names of the players currently trusted.
+            for (String uuid : trustManager.getTrustedPlayers(player)) {
                 String trustedPlayerName = trustManager.getPlayerName(uuid);
                 if (trustedPlayerName != null && trustedPlayerName.equalsIgnoreCase(targetPlayerName)) {
                     targetUUID = uuid;
@@ -78,46 +76,41 @@ public class UntrustCommand implements CommandExecutor, TabCompleter {
         }
 
         if (targetUUID == null) {
-            messages.send(player, messages.get("player_not_trusted").replace("{player}", targetPlayerName));
+            messages.send(player, "player_not_trusted", "player", targetPlayerName);
             return true;
         }
 
-        // Remove trust relationship
-        boolean success = trustManager.untrustPlayer(player.getUniqueId().toString(), targetUUID);
+        if (!trustManager.untrustPlayer(player.getUniqueId().toString(), targetUUID)) {
+            messages.send(player, "player_not_trusted", "player", actualPlayerName);
+            return true;
+        }
 
-        if (success) {
-            // Send confirmation message
-            messages.send(player, messages.get("player_untrusted").replace("{player}", actualPlayerName));
+        messages.send(player, "player_untrusted", "player", actualPlayerName);
 
-            // Notify the untrusted player if they're online
-            if (targetPlayer != null && targetPlayer.isOnline()) {
-                messages.send(targetPlayer, messages.get("untrusted_by_player").replace("{player}", player.getName()));
-            }
-        } else {
-            messages.send(player, messages.get("player_not_trusted").replace("{player}", actualPlayerName));
+        if (targetPlayer != null && targetPlayer.isOnline()) {
+            messages.send(targetPlayer, "untrusted_by_player", "player", player.getName());
         }
 
         return true;
     }
 
     /**
-     * Removes trust from all players for the command sender.
+     * Removes every player from the sender's trusted list.
      */
     private void untrustAllPlayers(Player player) {
         Set<String> trustedUUIDs = trustManager.getTrustedPlayers(player);
 
         if (trustedUUIDs.isEmpty()) {
-            messages.send(player, messages.get("no_trusted_players"));
+            messages.send(player, "no_trusted_players");
             return;
         }
 
         int removedCount = 0;
 
-        // Notify all trusted players that they're being untrusted
         for (String uuid : trustedUUIDs) {
             Player trustedPlayer = resolveOnlinePlayer(uuid);
             if (trustedPlayer != null && trustedPlayer.isOnline()) {
-                messages.send(trustedPlayer, messages.get("untrusted_by_player").replace("{player}", player.getName()));
+                messages.send(trustedPlayer, "untrusted_by_player", "player", player.getName());
             }
 
             if (trustManager.untrustPlayer(player.getUniqueId().toString(), uuid)) {
@@ -126,9 +119,9 @@ public class UntrustCommand implements CommandExecutor, TabCompleter {
         }
 
         if (removedCount > 0) {
-            messages.send(player, messages.get("all_players_untrusted").replace("{count}", String.valueOf(removedCount)));
+            messages.send(player, "all_players_untrusted", "count", removedCount);
         } else {
-            messages.send(player, messages.get("untrust_all_failed"));
+            messages.send(player, "untrust_all_failed");
         }
     }
 
@@ -137,7 +130,7 @@ public class UntrustCommand implements CommandExecutor, TabCompleter {
      */
     private Player resolveOnlinePlayer(String uuid) {
         try {
-            return Bukkit.getPlayer(java.util.UUID.fromString(uuid));
+            return Bukkit.getPlayer(UUID.fromString(uuid));
         } catch (IllegalArgumentException e) {
             return null;
         }
