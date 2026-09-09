@@ -107,16 +107,8 @@ public class PrivateChestAPI {
         ChestLocker locker = getChestLocker();
         if (locker == null) return false;
 
-        boolean success = locker.lockChest(block, player, password);
-        if (success) {
-            // Save data after successful lock
-            PrivateChest plugin = PrivateChest.getInstance();
-            if (plugin != null && plugin.getDataManager() != null) {
-                plugin.getDataManager().saveData();
-            }
-        }
-
-        return success;
+        // Persistence is handled automatically by the protection registry.
+        return locker.lockChest(block, player, password);
     }
 
     /**
@@ -135,19 +127,8 @@ public class PrivateChestAPI {
         ChestLocker locker = getChestLocker();
         if (locker == null) return false;
 
-        if (!locker.isChestLocked(block)) {
-            return false; // Block wasn't locked
-        }
-
-        locker.removeProtection(block);
-
-        // Save data after successful unlock
-        PrivateChest plugin = PrivateChest.getInstance();
-        if (plugin != null && plugin.getDataManager() != null) {
-            plugin.getDataManager().saveData();
-        }
-
-        return true;
+        // Persistence is handled automatically by the protection registry.
+        return locker.removeProtection(block);
     }
 
     /**
@@ -187,12 +168,13 @@ public class PrivateChestAPI {
             throw new IllegalArgumentException("Material cannot be null");
         }
 
-        if (material == Material.CHEST || material == Material.TRAPPED_CHEST || material == Material.BARREL) {
-            return true;
-        }
-        
-        // Support all shulker box variants
-        return material.name().contains("SHULKER_BOX");
+        // Answered by the container registry, which resolves the protectable types at runtime from the
+        // server's materials and the owner's configuration. This used to be a hardcoded list here, so
+        // it disagreed with the rest of the plugin whenever that list changed.
+        PrivateChest plugin = PrivateChest.getInstance();
+        return plugin != null
+                && plugin.getContainerRegistry() != null
+                && plugin.getContainerRegistry().isLockable(material);
     }
 
     /**
@@ -204,7 +186,7 @@ public class PrivateChestAPI {
         ChestLocker locker = getChestLocker();
         if (locker == null) return 0;
 
-        return locker.getChestOwners().size();
+        return locker.getProtectionCount();
     }
 
     /**

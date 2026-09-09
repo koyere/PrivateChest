@@ -1,93 +1,114 @@
 package me.tuplugin.privatechest.storage;
 
-import org.bukkit.Location;
-
 import java.util.Map;
 import java.util.Set;
 
 /**
- * Interface for different data storage implementations.
- * Allows switching between YAML and SQLite storage systems.
- * 
- * @since 2.0 (extended in 2.1)
- * @author PrivateChest Team
+ * A persistence backend for protection and trust data.
+ *
+ * <p>Rewritten in 3.0. The previous contract only offered "load everything" and "save everything",
+ * which meant a single player locking a chest rewrote the entire data file (or, on SQLite, deleted
+ * and re-inserted every row) on the main thread. It also silently dropped container names and trust
+ * relations on the SQLite backend, because those parameters were accepted and ignored.</p>
+ *
+ * <p>The contract is now incremental: the persistence worker reports exactly which records changed
+ * and the backend applies just those. Implementations only ever run on the persistence worker
+ * thread, so they do not need to be thread-safe internally, but they must never touch the Bukkit
+ * API.</p>
+ *
+ * @since 3.0
  */
 public interface DataStorage {
 
     /**
-     * Initializes the storage system.
-     * @return true if initialization was successful, false otherwise.
+     * Opens the backend, creating and upgrading the schema or file layout as needed.
+     *
+     * @return true if the backend is usable
      */
     boolean initialize();
 
     /**
-     * Loads all plugin data from storage.
-     * This method loads chest protection data, container names, and trust relationships.
-     * 
-     * @param owners Map to populate with location -> owner UUID data
-     * @param passwords Map to populate with location -> password data
-     * @param containerNames Map to populate with location -> custom name data (can be null to skip)
-     * @param trustRelations Map to populate with owner UUID -> Set of trusted UUIDs (can be null to skip)
-     * @return true if loading was successful, false otherwise
+     * Reads the full dataset. Called once at startup and again after a storage migration.
+     *
+     * @return the loaded data, or null if reading failed
      */
-    boolean loadData(Map<Location, String> owners, Map<Location, String> passwords, 
-                     Map<Location, String> containerNames, Map<String, Set<String>> trustRelations);
+    LoadResult loadAll();
 
     /**
-     * Saves all plugin data to storage.
-     * This method saves chest protection data, container names, and trust relationships.
-     * 
-     * @param owners Map containing location -> owner UUID data
-     * @param passwords Map containing location -> password data
-     * @param containerNames Map containing location -> custom name data (can be null to skip)
-     * @param trustRelations Map containing owner UUID -> Set of trusted UUIDs (can be null to skip)
-     * @return true if saving was successful, false otherwise
+     * Applies a set of changes.
+     *
+     * <p>Keys present in {@code protectionUpserts} must be inserted or updated. Keys present in
+     * {@code protectionDeletes} must be removed. The same applies to the trust maps, where the key
+     * is an owner UUID string and the value is that owner's complete trusted list.</p>
+     *
+     * @return true if every change was applied
      */
-    boolean saveData(Map<Location, String> owners, Map<Location, String> passwords,
-                     Map<Location, String> containerNames, Map<String, Set<String>> trustRelations);
+    boolean writeBatch(Map<ProtectionKey, Protection> protectionUpserts,
+                       Set<ProtectionKey> protectionDeletes,
+                       Map<String, Set<String>> trustUpserts,
+                       Set<String> trustDeletes);
 
     /**
-     * Legacy method for loading only chest data (for backward compatibility).
-     * Implementations should delegate to the new loadData method with null parameters.
-     * 
-     * @param owners Map to populate with location -> owner UUID data
-     * @param passwords Map to populate with location -> password data
-     * @return true if loading was successful, false otherwise
-     * @deprecated Use {@link #loadData(Map, Map, Map, Map)} instead
+     * Replaces the entire contents of the backend with the given dataset.
+     * Used for storage migrations and for the initial write of an empty backend.
+     *
+     * @return true if the write succeeded
      */
-    @Deprecated
-    default boolean loadData(Map<Location, String> owners, Map<Location, String> passwords) {
-        return loadData(owners, passwords, null, null);
-    }
+    boolean writeAll(Map<ProtectionKey, Protection> protections, Map<String, Set<String>> trust);
 
     /**
-     * Legacy method for saving only chest data (for backward compatibility).
-     * Implementations should delegate to the new saveData method with null parameters.
-     * 
-     * @param owners Map containing location -> owner UUID data
-     * @param passwords Map containing location -> password data
-     * @return true if saving was successful, false otherwise
-     * @deprecated Use {@link #saveData(Map, Map, Map, Map)} instead
+     * Flushes any buffered state to disk. Called before shutdown and after migrations.
+     *
+     * @return true if the flush succeeded
      */
-    @Deprecated
-    default boolean saveData(Map<Location, String> owners, Map<Location, String> passwords) {
-        return saveData(owners, passwords, null, null);
-    }
+    boolean flush();
 
     /**
-     * Closes the storage connection and cleans up resources.
+     * Releases file handles and connections.
      */
     void close();
 
     /**
-     * Gets the name of this storage type for logging purposes.
-     * @return The storage type name (e.g., "YAML", "SQLite")
+     * Human readable backend name, used in log output and admin messages.
      */
     String getStorageType();
 
     /**
-     * Checks if the storage system is available and ready to use.
-     * @return true if the storage is ready, false otherwise
+     * Whether the backend is open and usable.
      */
     boolean isReady();
+
+    /**
+     * Result of a full read.
+     */
+    final class LoadResult {
+
+        private final Map<ProtectionKey, Protection> protections;
+        private final Map<String, Set<String>> trust;
+        private final int skipped;
+
+        public LoadResult(Map<ProtectionKey, Protection> protections,
+                          Map<String, Set<String>> trust,
+                          int skipped) {
+            this.protections = protections;
+            this.trust = trust;
+            this.skipped = skipped;
+        }
+
+        public Map<ProtectionKey, Protection> getProtections() {
+            return protections;
+        }
+
+        public Map<String, Set<String>> getTrust() {
+            return trust;
+        }
+
+        /**
+         * Number of records that could not be read, for example because they were malformed.
+         * Reported in the startup log so admins can spot a damaged data file.
+         */
+        public int getSkipped() {
+            return skipped;
+        }
+    }
 }

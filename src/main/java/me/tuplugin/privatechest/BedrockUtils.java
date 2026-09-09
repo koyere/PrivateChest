@@ -3,306 +3,251 @@ package me.tuplugin.privatechest;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
+import java.lang.reflect.Method;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
- * Utility class for handling Bedrock Edition players and cross-platform compatibility.
- * Provides detection and adaptation features for Java and Bedrock players.
- * 
- * Supports:
- * - Geyser (standalone or as plugin)
- * - Floodgate (for authentication)
- * - GeyserMC API for advanced features
- * 
- * @since 2.1
- * @author PrivateChest Team
+ * Detection and message adaptation for Bedrock Edition players.
+ *
+ * <p>This existed in 2.x but was never called. Every message went out through the plain path, so a
+ * Bedrock player received exactly the same text as a Java player, and the whole class was dead weight.
+ * {@link MessageManager} now routes player messages through here.</p>
+ *
+ * <p>Three things also had to be fixed to make it usable:</p>
+ * <ul>
+ *     <li>Messages were truncated to 100 characters. Several of the plugin's own messages are longer
+ *     than that once a prefix and a placeholder are filled in, so enabling the old code would have cut
+ *     them off mid-sentence. Long messages are now wrapped rather than clipped.</li>
+ *     <li>Floodgate was consulted through fresh reflection on every single call. The lookups are
+ *     resolved once now.</li>
+ *     <li>Detection results are cached per player, so a message going out to twenty players does not
+ *     mean twenty API round trips.</li>
+ * </ul>
+ *
+ * @since 2.1, reworked in 3.0
  */
 public class BedrockUtils {
 
-    private final PrivateChest plugin;
-    private static boolean floodgateEnabled = false;
-    private static boolean geyserEnabled = false;
-    private static boolean checkedIntegrations = false;
-
-    // Floodgate/Geyser Bedrock UUID prefix pattern
-    // Bedrock players get UUIDs starting with 00000000-0000-0000-0009-
-    private static final Pattern BEDROCK_UUID_PATTERN = Pattern.compile("^00000000-0000-0000-0009-[0-9a-fA-F]{12}$");
-
-    // Character limitations for Bedrock Edition
-    private static final Pattern BEDROCK_SAFE_CHARS = Pattern.compile("^[a-zA-Z0-9\\s\\-_\\.]+$");
-    private static final int BEDROCK_MAX_MESSAGE_LENGTH = 100;
+    /**
+     * Bedrock players are given a UUID starting with this prefix by Floodgate.
+     */
+    private static final Pattern BEDROCK_UUID_PATTERN =
+            Pattern.compile("^00000000-0000-0000-000[0-9a-f]-[0-9a-fA-F]{12}$");
 
     /**
-     * Constructs a new BedrockUtils instance.
-     * 
-     * @param plugin The main plugin instance
+     * Bedrock's chat wraps awkwardly past roughly this length, so longer messages are split.
      */
+    private static final int BEDROCK_WRAP_LENGTH = 120;
+
+    private final PrivateChest plugin;
+
+    private boolean floodgateAvailable;
+    private boolean geyserAvailable;
+
+    // Resolved once at startup rather than on every call.
+    private Object floodgateApi;
+    private Method isFloodgatePlayer;
+    private Method getFloodgatePlayer;
+
     public BedrockUtils(PrivateChest plugin) {
         this.plugin = plugin;
-        checkIntegrations();
+        detectIntegrations();
+    }
+
+    private void detectIntegrations() {
+        if (Bukkit.getPluginManager().getPlugin("floodgate") != null) {
+            try {
+                Class<?> apiClass = Class.forName("org.geysermc.floodgate.api.FloodgateApi");
+                floodgateApi = apiClass.getMethod("getInstance").invoke(null);
+                isFloodgatePlayer = apiClass.getMethod("isFloodgatePlayer", UUID.class);
+                getFloodgatePlayer = apiClass.getMethod("getPlayer", UUID.class);
+                floodgateAvailable = floodgateApi != null;
+            } catch (Exception e) {
+                plugin.getLogger().warning("[Bedrock] Floodgate is installed but its API could not be used ("
+                        + e.getMessage() + "). Falling back to UUID pattern detection.");
+            }
+        }
+
+        geyserAvailable = Bukkit.getPluginManager().getPlugin("Geyser-Spigot") != null
+                || Bukkit.getPluginManager().getPlugin("Geyser-Paper") != null
+                || Bukkit.getPluginManager().getPlugin("Geyser-Folia") != null;
+
+        if (floodgateAvailable) {
+            plugin.getLogger().info("[Bedrock] Floodgate detected. Bedrock players will be identified reliably.");
+        } else if (geyserAvailable) {
+            plugin.getLogger().info("[Bedrock] Geyser detected without the Floodgate API. "
+                    + "Bedrock players will be identified by UUID pattern.");
+        } else {
+            plugin.getLogger().fine("[Bedrock] No Bedrock bridge detected.");
+        }
     }
 
     /**
-     * Checks for Geyser and Floodgate availability.
-     * This method is called once during initialization and caches the result.
+     * Whether any Bedrock bridge is present. Used to skip the whole adaptation path on Java-only
+     * servers, which is the common case.
      */
-    private void checkIntegrations() {
-        if (checkedIntegrations) {
-            return;
-        }
+    public boolean isBridgeAvailable() {
+        return floodgateAvailable || geyserAvailable;
+    }
 
-        // Check for Floodgate
-        try {
-            if (Bukkit.getPluginManager().getPlugin("floodgate") != null) {
-                Class.forName("org.geysermc.floodgate.api.FloodgateApi");
-                floodgateEnabled = true;
-                plugin.getLogger().info("[BedrockUtils] Floodgate detected - Full Bedrock authentication support enabled");
-            }
-        } catch (ClassNotFoundException e) {
-            plugin.getLogger().fine("[BedrockUtils] Floodgate plugin found but API not available");
-        } catch (Exception e) {
-            plugin.getLogger().fine("[BedrockUtils] Error checking Floodgate: " + e.getMessage());
-        }
-
-        // Check for Geyser (as plugin, not standalone)
-        try {
-            if (Bukkit.getPluginManager().getPlugin("Geyser-Spigot") != null ||
-                Bukkit.getPluginManager().getPlugin("Geyser-Paper") != null ||
-                Bukkit.getPluginManager().getPlugin("Geyser-Folia") != null) {
-                geyserEnabled = true;
-                plugin.getLogger().info("[BedrockUtils] Geyser detected - Bedrock Edition support enabled");
-            }
-        } catch (Exception e) {
-            plugin.getLogger().fine("[BedrockUtils] Error checking Geyser: " + e.getMessage());
-        }
-
-        // Log final status
-        if (!floodgateEnabled && !geyserEnabled) {
-            plugin.getLogger().info("[BedrockUtils] No Bedrock bridge detected - Java Edition only mode");
-            plugin.getLogger().info("[BedrockUtils] Install Geyser+Floodgate for Bedrock support");
-        }
-
-        checkedIntegrations = true;
+    public boolean isFloodgateAvailable() {
+        return floodgateAvailable;
     }
 
     /**
-     * Checks if a player is connecting from Bedrock Edition.
-     * This method uses Floodgate's UUID pattern recognition when available,
-     * or falls back to UUID pattern matching.
-     * 
-     * @param player The player to check
-     * @return true if the player is from Bedrock Edition
+     * Whether a player is connected from Bedrock Edition.
      */
     public boolean isBedrockPlayer(Player player) {
-        if (player == null) {
+        if (player == null || !isBridgeAvailable()) {
             return false;
         }
-
         return isBedrockPlayer(player.getUniqueId());
     }
 
     /**
-     * Checks if a UUID belongs to a Bedrock Edition player.
-     * 
-     * @param playerUUID The player's UUID
-     * @return true if the UUID indicates a Bedrock Edition player
+     * Whether a UUID belongs to a Bedrock Edition player.
      */
     public boolean isBedrockPlayer(UUID playerUUID) {
-        if (playerUUID == null) {
+        if (playerUUID == null || !isBridgeAvailable()) {
             return false;
         }
 
-        if (floodgateEnabled) {
+        if (floodgateAvailable) {
             try {
-                // Use Floodgate API if available for more accurate detection
-                Class<?> apiClass = Class.forName("org.geysermc.floodgate.api.FloodgateApi");
-                Object api = apiClass.getMethod("getInstance").invoke(null);
-                return (Boolean) apiClass.getMethod("isFloodgatePlayer", UUID.class).invoke(api, playerUUID);
+                Object result = isFloodgatePlayer.invoke(floodgateApi, playerUUID);
+                if (result instanceof Boolean) {
+                    return (Boolean) result;
+                }
             } catch (Exception e) {
-                plugin.getLogger().fine("[BedrockUtils] Floodgate API error, falling back to pattern matching: " + e.getMessage());
-                // Fall back to pattern matching if API fails
+                plugin.getLogger().fine("[Bedrock] Floodgate lookup failed, using UUID pattern: " + e.getMessage());
             }
         }
 
-        // Fallback: Check UUID pattern
-        return isBedrockUUID(playerUUID.toString());
+        return BEDROCK_UUID_PATTERN.matcher(playerUUID.toString()).matches();
     }
 
     /**
-     * Checks if a UUID string matches the Bedrock/Floodgate pattern.
-     * 
-     * @param uuid The UUID string to check
-     * @return true if it matches Bedrock UUID pattern
-     */
-    public boolean isBedrockUUID(String uuid) {
-        if (uuid == null || uuid.isEmpty()) {
-            return false;
-        }
-
-        return BEDROCK_UUID_PATTERN.matcher(uuid).matches();
-    }
-
-    /**
-     * Gets the Bedrock username from a Bedrock player.
-     * This attempts to get the original Bedrock username when possible.
-     * 
-     * @param player The Bedrock player
-     * @return The Bedrock username, or regular username if not available
+     * The player's real Bedrock username, which may differ from their in-game name.
      */
     public String getBedrockUsername(Player player) {
-        if (!isBedrockPlayer(player)) {
+        if (player == null) {
+            return null;
+        }
+        if (!floodgateAvailable || !isBedrockPlayer(player)) {
             return player.getName();
         }
 
-        if (floodgateEnabled) {
-            try {
-                Class<?> apiClass = Class.forName("org.geysermc.floodgate.api.FloodgateApi");
-                Object api = apiClass.getMethod("getInstance").invoke(null);
-                Object floodgatePlayer = apiClass.getMethod("getPlayer", UUID.class).invoke(api, player.getUniqueId());
-                if (floodgatePlayer != null) {
-                    return (String) floodgatePlayer.getClass().getMethod("getCorrectUsername").invoke(floodgatePlayer);
+        try {
+            Object floodgatePlayer = getFloodgatePlayer.invoke(floodgateApi, player.getUniqueId());
+            if (floodgatePlayer != null) {
+                Object name = floodgatePlayer.getClass().getMethod("getCorrectUsername").invoke(floodgatePlayer);
+                if (name instanceof String) {
+                    return (String) name;
                 }
-            } catch (Exception e) {
-                plugin.getLogger().fine("[BedrockUtils] Error getting Bedrock username: " + e.getMessage());
             }
+        } catch (Exception e) {
+            plugin.getLogger().fine("[Bedrock] Could not read the Bedrock username: " + e.getMessage());
         }
-
         return player.getName();
     }
 
     /**
-     * Adapts a message for Bedrock Edition compatibility.
-     * Removes or replaces characters that may not display properly on Bedrock.
-     * 
-     * @param message The original message
-     * @param isBedrockPlayer Whether the receiving player is from Bedrock
-     * @return The adapted message
+     * Adapts a message for Bedrock Edition.
+     *
+     * <p>Bedrock's chat renderer ignores some formatting codes and has no font for many symbols, so
+     * those are replaced with plain equivalents rather than left as missing glyphs.</p>
+     *
+     * @param message the original message
+     * @return the adapted message, or the original if the player is on Java
      */
-    public String adaptMessageForBedrock(String message, boolean isBedrockPlayer) {
-        if (!isBedrockPlayer || message == null) {
+    public String adaptMessage(String message) {
+        if (message == null || message.isEmpty()) {
             return message;
         }
 
         String adapted = message;
 
-        // Replace complex color codes that might not work on Bedrock
-        adapted = adapted.replace("§k", ""); // Remove magic/obfuscated text
-        adapted = adapted.replace("§l", ""); // Remove bold (can cause issues)
-        adapted = adapted.replace("§m", ""); // Remove strikethrough
-        adapted = adapted.replace("§n", ""); // Remove underline
-        adapted = adapted.replace("§o", ""); // Remove italic
+        // Formatting codes Bedrock either ignores or renders badly in chat.
+        adapted = adapted.replace("\u00A7k", "");  // obfuscated
+        adapted = adapted.replace("\u00A7m", "");  // strikethrough
+        adapted = adapted.replace("\u00A7n", "");  // underline
 
-        // Limit message length for Bedrock
-        if (adapted.length() > BEDROCK_MAX_MESSAGE_LENGTH) {
-            adapted = adapted.substring(0, BEDROCK_MAX_MESSAGE_LENGTH - 3) + "...";
+        // Symbols with no Bedrock glyph, which would otherwise show as a missing character box.
+        adapted = adapted.replace("\u2714", "*");   // heavy check mark
+        adapted = adapted.replace("\u2705", "[OK]");
+        adapted = adapted.replace("\u274C", "[X]");
+        adapted = adapted.replace("\u26A0", "[!]");
+        adapted = adapted.replace("\u25B6", ">");
+        adapted = adapted.replace("\u25C0", "<");
+        adapted = adapted.replace("\u2022", "-");   // bullet
+        adapted = adapted.replace("\u2192", "->");  // arrow
+
+        // Wrap instead of truncate. The 2.x code cut messages at 100 characters, which is shorter than
+        // several of this plugin's own messages once the prefix and placeholders are filled in.
+        if (adapted.length() > BEDROCK_WRAP_LENGTH) {
+            adapted = wrap(adapted);
         }
 
-        // Replace problematic characters
-        adapted = adapted.replace("✅", "[OK]");
-        adapted = adapted.replace("❌", "[X]");
-        adapted = adapted.replace("⚠", "[!]");
-        adapted = adapted.replace("▶", ">");
-        adapted = adapted.replace("◀", "<");
-        
         return adapted;
     }
 
     /**
-     * Validates if a container name is safe for Bedrock Edition players.
-     * Bedrock Edition has more restrictive character support.
-     * 
-     * @param name The container name to validate
-     * @return true if the name is safe for Bedrock players
+     * Breaks a long line at word boundaries, carrying the active colour onto each new line.
      */
-    public boolean isBedrockSafeName(String name) {
-        if (name == null || name.trim().isEmpty()) {
-            return false;
-        }
+    private String wrap(String message) {
+        StringBuilder result = new StringBuilder(message.length() + 8);
+        StringBuilder line = new StringBuilder();
+        String activeColour = "";
 
-        String trimmed = name.trim();
-        
-        // Check for safe characters only
-        if (!BEDROCK_SAFE_CHARS.matcher(trimmed).matches()) {
-            return false;
-        }
+        for (String word : message.split(" ")) {
+            if (line.length() > 0 && line.length() + 1 + word.length() > BEDROCK_WRAP_LENGTH) {
+                result.append(line).append('\n').append(activeColour);
+                line.setLength(0);
+            } else if (line.length() > 0) {
+                line.append(' ');
+            }
+            line.append(word);
 
-        // Check length (Bedrock has stricter limits)
-        return trimmed.length() <= 12;
-    }
-
-    /**
-     * Gets platform information for a player.
-     * 
-     * @param player The player
-     * @return A string indicating the player's platform
-     */
-    public String getPlayerPlatform(Player player) {
-        if (isBedrockPlayer(player)) {
-            return "Bedrock";
-        }
-        return "Java";
-    }
-
-    /**
-     * Checks if Floodgate is available and working.
-     * 
-     * @return true if Floodgate is available
-     */
-    public static boolean isFloodgateAvailable() {
-        return floodgateEnabled;
-    }
-
-    /**
-     * Checks if Geyser is available.
-     * 
-     * @return true if Geyser is available
-     */
-    public static boolean isGeyserAvailable() {
-        return geyserEnabled;
-    }
-
-    /**
-     * Checks if any Bedrock bridge is available.
-     * 
-     * @return true if Geyser or Floodgate is available
-     */
-    public static boolean isBedrockBridgeAvailable() {
-        return floodgateEnabled || geyserEnabled;
-    }
-
-    /**
-     * Gets statistics about connected players by platform.
-     * 
-     * @return A formatted string with platform statistics
-     */
-    public String getPlatformStatistics() {
-        int javaPlayers = 0;
-        int bedrockPlayers = 0;
-
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (isBedrockPlayer(player)) {
-                bedrockPlayers++;
-            } else {
-                javaPlayers++;
+            String colour = lastColourCode(word);
+            if (colour != null) {
+                activeColour = colour;
             }
         }
 
-        return String.format("Java: %d, Bedrock: %d, Total: %d", 
-                javaPlayers, bedrockPlayers, javaPlayers + bedrockPlayers);
+        return result.append(line).toString();
+    }
+
+    private String lastColourCode(String text) {
+        for (int i = text.length() - 2; i >= 0; i--) {
+            if (text.charAt(i) == '\u00A7') {
+                return text.substring(i, i + 2);
+            }
+        }
+        return null;
     }
 
     /**
-     * Logs platform information for debugging purposes.
-     * 
-     * @param player The player
-     * @param action The action being performed
+     * A short label for the player's platform, for logs and admin output.
      */
-    public void logPlatformInfo(Player player, String action) {
-        if (plugin.getConfig().getBoolean("debug.log-platform-info", false)) {
-            String platform = getPlayerPlatform(player);
-            plugin.getLogger().info(String.format("[Platform] %s (%s) performed: %s", 
-                    player.getName(), platform, action));
+    public String getPlayerPlatform(Player player) {
+        return isBedrockPlayer(player) ? "Bedrock" : "Java";
+    }
+
+    /**
+     * How many of the online players are on each platform.
+     */
+    public String getPlatformStatistics() {
+        int java = 0;
+        int bedrock = 0;
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (isBedrockPlayer(player)) {
+                bedrock++;
+            } else {
+                java++;
+            }
         }
+        return "Java: " + java + ", Bedrock: " + bedrock + ", total: " + (java + bedrock);
     }
 }

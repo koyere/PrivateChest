@@ -1,18 +1,22 @@
 package me.tuplugin.privatechest.commands;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
 import me.tuplugin.privatechest.MessageManager;
 import me.tuplugin.privatechest.PrivateChest;
 import me.tuplugin.privatechest.TrustManager;
+import me.tuplugin.privatechest.util.TabUtils;
 
-public class TrustCommand implements CommandExecutor {
+public class TrustCommand implements CommandExecutor, TabCompleter {
 
     private final PrivateChest plugin;
     private final TrustManager trustManager;
@@ -27,19 +31,19 @@ public class TrustCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player)) {
-            sender.sendMessage(messages.raw("console_only_player"));
+            messages.send(sender, messages.raw("console_only_player"));
             return true;
         }
 
         Player player = (Player) sender;
 
         if (!player.hasPermission("privatechest.trust")) {
-            player.sendMessage(messages.raw("no_permission"));
+            messages.send(player, messages.raw("no_permission"));
             return true;
         }
 
         if (args.length == 0) {
-            player.sendMessage(messages.raw("usage_trust"));
+            messages.send(player, messages.raw("usage_trust"));
             return true;
         }
 
@@ -54,13 +58,13 @@ public class TrustCommand implements CommandExecutor {
         // Find target player
         Player targetPlayer = Bukkit.getPlayer(targetPlayerName);
         if (targetPlayer == null) {
-            player.sendMessage(messages.get("player_not_found").replace("{player}", targetPlayerName));
+            messages.send(player, messages.get("player_not_found").replace("{player}", targetPlayerName));
             return true;
         }
 
         // Prevent trusting yourself
         if (player.getUniqueId().equals(targetPlayer.getUniqueId())) {
-            player.sendMessage(messages.get("cannot_trust_yourself"));
+            messages.send(player, messages.get("cannot_trust_yourself"));
             return true;
         }
 
@@ -68,18 +72,15 @@ public class TrustCommand implements CommandExecutor {
         boolean success = trustManager.trustPlayer(player, targetPlayer);
 
         if (success) {
-            // Save trust data
-            plugin.getDataManager().saveData();
-
             // Send confirmation messages
-            player.sendMessage(messages.get("player_trusted").replace("{player}", targetPlayer.getName()));
+            messages.send(player, messages.get("player_trusted").replace("{player}", targetPlayer.getName()));
 
             // Notify the trusted player if they're online
             if (targetPlayer.isOnline()) {
-                targetPlayer.sendMessage(messages.get("trusted_by_player").replace("{player}", player.getName()));
+                messages.send(targetPlayer, messages.get("trusted_by_player").replace("{player}", player.getName()));
             }
         } else {
-            player.sendMessage(messages.get("player_already_trusted").replace("{player}", targetPlayer.getName()));
+            messages.send(player, messages.get("player_already_trusted").replace("{player}", targetPlayer.getName()));
         }
 
         return true;
@@ -92,24 +93,68 @@ public class TrustCommand implements CommandExecutor {
         Set<String> trustedUUIDs = trustManager.getTrustedPlayers(player);
 
         if (trustedUUIDs.isEmpty()) {
-            player.sendMessage(messages.get("no_trusted_players"));
+            messages.send(player, messages.get("no_trusted_players"));
             return;
         }
 
-        player.sendMessage(messages.get("trusted_players_header"));
+        messages.send(player, messages.get("trusted_players_header"));
 
         for (String uuid : trustedUUIDs) {
             String playerName = trustManager.getPlayerName(uuid);
-            Player trustedPlayer = Bukkit.getPlayer(java.util.UUID.fromString(uuid));
+            if (playerName == null) {
+                playerName = messages.raw("unknown_player");
+            }
+            Player trustedPlayer = resolveOnlinePlayer(uuid);
             String status = (trustedPlayer != null && trustedPlayer.isOnline()) ?
                     messages.raw("player_status_online") : messages.raw("player_status_offline");
 
-            player.sendMessage(messages.get("trusted_player_entry")
+            messages.send(player, messages.get("trusted_player_entry")
                     .replace("{player}", playerName)
                     .replace("{status}", status));
         }
 
-        player.sendMessage(messages.get("trusted_players_footer")
+        messages.send(player, messages.get("trusted_players_footer")
                 .replace("{count}", String.valueOf(trustedUUIDs.size())));
+    }
+
+    /**
+     * Resolves a stored UUID string to an online player, tolerating malformed entries.
+     */
+    private Player resolveOnlinePlayer(String uuid) {
+        try {
+            return Bukkit.getPlayer(java.util.UUID.fromString(uuid));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (!(sender instanceof Player) || !sender.hasPermission("privatechest.trust")) {
+            return TabUtils.none();
+        }
+
+        if (args.length == 1) {
+            // Players who can be trusted, plus the subcommand. Players already trusted are left out,
+            // since trusting them again does nothing.
+            Set<String> alreadyTrusted = new java.util.HashSet<>();
+            for (String uuid : trustManager.getTrustedPlayers((Player) sender)) {
+                String name = trustManager.getPlayerName(uuid);
+                if (name != null) {
+                    alreadyTrusted.add(name.toLowerCase());
+                }
+            }
+
+            List<String> options = new ArrayList<>();
+            options.add("list");
+            for (String name : TabUtils.visiblePlayerNames(sender, "")) {
+                if (!alreadyTrusted.contains(name.toLowerCase())) {
+                    options.add(name);
+                }
+            }
+            return TabUtils.filter(options, args[0]);
+        }
+
+        return TabUtils.none();
     }
 }

@@ -1,22 +1,59 @@
 package me.tuplugin.privatechest.storage;
 
 import me.tuplugin.privatechest.PrivateChest;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.*;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 /**
- * YAML-based storage implementation for chest data.
- * Uses the traditional data.yml file format.
+ * File based storage using data.yml.
+ *
+ * <p>The on-disk layout is unchanged from 2.x, so upgrades and downgrades of the data file are
+ * non-events. Three things did change:</p>
+ * <ul>
+ *     <li>Writes are atomic. The file is written to a temporary file and then moved into place, so a
+ *     crash or a full disk can no longer leave a half-written data.yml behind. Previously an
+ *     interrupted save could truncate the file and destroy every protection on the server.</li>
+ *     <li>Writes are incremental. Only the records that changed are touched in the configuration
+ *     tree, instead of clearing and rebuilding the whole thing on every save.</li>
+ *     <li>Records belonging to worlds that are not currently loaded are kept. The old loader
+ *     discarded them, and the next save then wrote that loss to disk permanently. Unmounting a world
+ *     temporarily, or loading it late with a world manager, no longer destroys its protections.</li>
+ * </ul>
+ *
+ * @since 3.0
  */
 public class YamlStorage implements DataStorage {
+
+    /** Marker written into data.yml so future versions can detect the layout in use. */
+    private static final int DATA_VERSION = 3;
+
+    private static final String VERSION_PATH = "data-version";
+    private static final String CONTAINERS_SECTION = "chests";
+    private static final String TRUST_SECTION = "trust";
+
+    /**
+     * Path separator used for configuration lookups.
+     *
+     * <p>Record keys embed the world name ({@code world,x,y,z}). With the default '.' separator, a
+     * world named "world.old" was silently split into nested sections and its records were
+     * corrupted. A NUL separator cannot occur in a world name, so keys are always treated as
+     * literals.</p>
+     */
+    private static final char PATH_SEPARATOR = '\u0000';
 
     private final PrivateChest plugin;
     private File dataFile;
@@ -32,126 +69,176 @@ public class YamlStorage implements DataStorage {
             dataFile = new File(plugin.getDataFolder(), "data.yml");
 
             if (!dataFile.exists()) {
-                dataFile.createNewFile();
-                plugin.getLogger().info("[PrivateChest] data.yml created.");
+                File parent = dataFile.getParentFile();
+                if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                    plugin.getLogger().severe("[Storage] Could not create the plugin data folder.");
+                    return false;
+                }
+                if (dataFile.createNewFile()) {
+                    plugin.getLogger().info("[Storage] Created data.yml.");
+                }
             }
 
             dataConfig = YamlConfiguration.loadConfiguration(dataFile);
+            dataConfig.options().pathSeparator(PATH_SEPARATOR);
+
+            backupLegacyFileIfNeeded();
+            dataConfig.set(VERSION_PATH, DATA_VERSION);
             return true;
         } catch (IOException e) {
-            plugin.getLogger().severe("[PrivateChest] Failed to initialize YAML storage!");
-            e.printStackTrace();
+            plugin.getLogger().severe("[Storage] Failed to open data.yml: " + e.getMessage());
             return false;
         }
     }
 
-    @Override
-    public boolean loadData(Map<Location, String> owners, Map<Location, String> passwords,
-                           Map<Location, String> containerNames, Map<String, Set<String>> trustRelations) {
+    /**
+     * Copies a pre-3.0 data file aside before it is written in the new format.
+     * Gives admins a guaranteed rollback point on the first start after updating.
+     */
+    private void backupLegacyFileIfNeeded() {
+        if (dataConfig.contains(VERSION_PATH)) {
+            return;
+        }
+        if (!dataConfig.isConfigurationSection(CONTAINERS_SECTION)) {
+            // Brand new or empty file, nothing worth backing up.
+            return;
+        }
+
+        File backup = new File(plugin.getDataFolder(), "data.yml.v2-backup");
+        if (backup.exists()) {
+            return;
+        }
+
         try {
-            // Clear maps before loading to avoid duplicates
-            owners.clear();
-            passwords.clear();
-            if (containerNames != null) {
-                containerNames.clear();
-            }
-            if (trustRelations != null) {
-                trustRelations.clear();
-            }
-
-            // Load chest data from YAML
-            ConfigurationSection chestsSection = dataConfig.getConfigurationSection("chests");
-            if (chestsSection != null) {
-                for (String key : chestsSection.getKeys(false)) {
-                    Location loc = deserializeLocation(key);
-                    String owner = dataConfig.getString("chests." + key + ".owner");
-                    String password = dataConfig.getString("chests." + key + ".password");
-
-                    if (loc != null && owner != null && password != null) {
-                        owners.put(loc, owner);
-                        passwords.put(loc, password);
-                        
-                        // Load container name if provided and exists
-                        if (containerNames != null) {
-                            String name = dataConfig.getString("chests." + key + ".name");
-                            if (name != null && !name.trim().isEmpty()) {
-                                containerNames.put(loc, name.trim());
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Load trust relationships if provided
-            if (trustRelations != null) {
-                ConfigurationSection trustSection = dataConfig.getConfigurationSection("trust");
-                if (trustSection != null) {
-                    for (String ownerUUID : trustSection.getKeys(false)) {
-                        List<String> trustedList = dataConfig.getStringList("trust." + ownerUUID);
-                        if (!trustedList.isEmpty()) {
-                            trustRelations.put(ownerUUID, new HashSet<>(trustedList));
-                        }
-                    }
-                }
-            }
-
-            plugin.getLogger().info("[PrivateChest] Loaded " + owners.size() + " locked chests from YAML storage.");
-            return true;
-        } catch (Exception e) {
-            plugin.getLogger().severe("[PrivateChest] Failed to load data from YAML storage!");
-            e.printStackTrace();
-            return false;
+            Files.copy(dataFile.toPath(), backup.toPath());
+            plugin.getLogger().info("[Storage] Existing data.yml backed up to data.yml.v2-backup "
+                    + "before upgrading to the 3.0 format.");
+        } catch (IOException e) {
+            plugin.getLogger().warning("[Storage] Could not create data.yml.v2-backup: " + e.getMessage());
         }
     }
 
     @Override
-    public boolean saveData(Map<Location, String> owners, Map<Location, String> passwords,
-                           Map<Location, String> containerNames, Map<String, Set<String>> trustRelations) {
-        try {
-            // Clear existing data to avoid old entries
-            dataConfig.set("chests", null);
-            dataConfig.set("trust", null);
+    public LoadResult loadAll() {
+        if (!isReady()) {
+            return null;
+        }
 
-            // Save chest data
-            for (Location loc : owners.keySet()) {
-                String path = serializeLocation(loc);
-                if (path != null) {
-                    dataConfig.set("chests." + path + ".owner", owners.get(loc));
-                    dataConfig.set("chests." + path + ".password", passwords.get(loc));
-                    
-                    // Save container name if provided and exists
-                    if (containerNames != null && containerNames.containsKey(loc)) {
-                        String name = containerNames.get(loc);
-                        if (name != null && !name.trim().isEmpty()) {
-                            dataConfig.set("chests." + path + ".name", name.trim());
-                        }
-                    }
+        Map<ProtectionKey, Protection> protections = new HashMap<>();
+        Map<String, Set<String>> trust = new HashMap<>();
+        int skipped = 0;
+
+        ConfigurationSection containers = dataConfig.getConfigurationSection(CONTAINERS_SECTION);
+        if (containers != null) {
+            for (String rawKey : containers.getKeys(false)) {
+                ConfigurationSection entry = containers.getConfigurationSection(rawKey);
+                if (entry == null) {
+                    skipped++;
+                    continue;
+                }
+
+                ProtectionKey key = ProtectionKey.deserialize(rawKey);
+                if (key == null) {
+                    plugin.getLogger().warning("[Storage] Skipping malformed container entry: " + rawKey);
+                    skipped++;
+                    continue;
+                }
+
+                String ownerRaw = entry.getString("owner");
+                String password = entry.getString("password");
+                if (ownerRaw == null || password == null) {
+                    plugin.getLogger().warning("[Storage] Skipping incomplete container entry: " + rawKey);
+                    skipped++;
+                    continue;
+                }
+
+                UUID owner;
+                try {
+                    owner = UUID.fromString(ownerRaw);
+                } catch (IllegalArgumentException e) {
+                    plugin.getLogger().warning("[Storage] Skipping container entry with an invalid owner UUID: "
+                            + rawKey);
+                    skipped++;
+                    continue;
+                }
+
+                String type = trimToNull(entry.getString("type"));
+                String name = trimToNull(entry.getString("name"));
+                protections.put(key, new Protection(owner, password, type, name));
+            }
+        }
+
+        ConfigurationSection trustSection = dataConfig.getConfigurationSection(TRUST_SECTION);
+        if (trustSection != null) {
+            for (String ownerUuid : trustSection.getKeys(false)) {
+                List<String> trusted = trustSection.getStringList(ownerUuid);
+                if (trusted != null && !trusted.isEmpty()) {
+                    trust.put(ownerUuid, new HashSet<>(trusted));
                 }
             }
-            
-            // Save trust relationships if provided
-            if (trustRelations != null && !trustRelations.isEmpty()) {
-                for (Map.Entry<String, Set<String>> entry : trustRelations.entrySet()) {
-                    String ownerUUID = entry.getKey();
-                    Set<String> trustedUUIDs = entry.getValue();
-                    if (!trustedUUIDs.isEmpty()) {
-                        dataConfig.set("trust." + ownerUUID, new ArrayList<>(trustedUUIDs));
-                    }
-                }
-            }
+        }
 
-            dataConfig.save(dataFile);
-            return true;
-        } catch (IOException e) {
-            plugin.getLogger().severe("[PrivateChest] Could not save data to YAML storage!");
-            e.printStackTrace();
+        return new LoadResult(protections, trust, skipped);
+    }
+
+    @Override
+    public boolean writeBatch(Map<ProtectionKey, Protection> protectionUpserts,
+                              Set<ProtectionKey> protectionDeletes,
+                              Map<String, Set<String>> trustUpserts,
+                              Set<String> trustDeletes) {
+        if (!isReady()) {
             return false;
         }
+
+        for (Map.Entry<ProtectionKey, Protection> entry : protectionUpserts.entrySet()) {
+            writeProtection(entry.getKey(), entry.getValue());
+        }
+        for (ProtectionKey key : protectionDeletes) {
+            dataConfig.set(path(CONTAINERS_SECTION, key.serialize()), null);
+        }
+        for (Map.Entry<String, Set<String>> entry : trustUpserts.entrySet()) {
+            dataConfig.set(path(TRUST_SECTION, entry.getKey()), new ArrayList<>(entry.getValue()));
+        }
+        for (String owner : trustDeletes) {
+            dataConfig.set(path(TRUST_SECTION, owner), null);
+        }
+
+        return saveAtomically();
+    }
+
+    @Override
+    public boolean writeAll(Map<ProtectionKey, Protection> protections, Map<String, Set<String>> trust) {
+        if (!isReady()) {
+            return false;
+        }
+
+        dataConfig.set(CONTAINERS_SECTION, null);
+        dataConfig.set(TRUST_SECTION, null);
+
+        if (protections != null) {
+            for (Map.Entry<ProtectionKey, Protection> entry : protections.entrySet()) {
+                writeProtection(entry.getKey(), entry.getValue());
+            }
+        }
+        if (trust != null) {
+            for (Map.Entry<String, Set<String>> entry : trust.entrySet()) {
+                if (entry.getValue() != null && !entry.getValue().isEmpty()) {
+                    dataConfig.set(path(TRUST_SECTION, entry.getKey()), new ArrayList<>(entry.getValue()));
+                }
+            }
+        }
+
+        return saveAtomically();
+    }
+
+    @Override
+    public boolean flush() {
+        // Every batch is already persisted by saveAtomically().
+        return true;
     }
 
     @Override
     public void close() {
-        // YAML doesn't require explicit closing
         dataConfig = null;
         dataFile = null;
     }
@@ -166,46 +253,65 @@ public class YamlStorage implements DataStorage {
         return dataFile != null && dataConfig != null;
     }
 
-    // --- Helper Methods ---
+    // --- Internals ---
 
-    /**
-     * Serializes a Location to a String (world,x,y,z)
-     */
-    private String serializeLocation(Location loc) {
-        if (loc == null || loc.getWorld() == null) {
-            plugin.getLogger().warning("[PrivateChest] Attempted to save a null location or location with null world. Skipping.");
-            return null;
-        }
-        return loc.getWorld().getName() + "," +
-                loc.getBlockX() + "," +
-                loc.getBlockY() + "," +
-                loc.getBlockZ();
+    private void writeProtection(ProtectionKey key, Protection protection) {
+        String base = path(CONTAINERS_SECTION, key.serialize());
+        dataConfig.set(path(base, "owner"), protection.getOwner().toString());
+        dataConfig.set(path(base, "password"), protection.getPasswordHash());
+        dataConfig.set(path(base, "type"), protection.getContainerType());
+        dataConfig.set(path(base, "name"), protection.getCustomName());
+    }
+
+    private static String path(String parent, String child) {
+        return parent + PATH_SEPARATOR + child;
     }
 
     /**
-     * Deserializes a String to a Location (world,x,y,z)
+     * Writes to a temporary file and moves it over data.yml, so the real file is either the previous
+     * complete version or the new complete version, never a partial write.
      */
-    private Location deserializeLocation(String str) {
-        String[] parts = str.split(",");
-        if (parts.length != 4) {
-            plugin.getLogger().warning("[PrivateChest] Malformed location string in data.yml: " + str);
-            return null;
-        }
+    private boolean saveAtomically() {
+        dataConfig.set(VERSION_PATH, DATA_VERSION);
 
-        World world = Bukkit.getWorld(parts[0]);
-        if (world == null) {
-            plugin.getLogger().warning("[PrivateChest] World '" + parts[0] + "' not found for location in data.yml: " + str);
-            return null;
+        File temp = new File(dataFile.getParentFile(), dataFile.getName() + ".tmp");
+        try {
+            dataConfig.save(temp);
+        } catch (IOException e) {
+            plugin.getLogger().severe("[Storage] Could not write data.yml: " + e.getMessage());
+            deleteQuietly(temp);
+            return false;
         }
 
         try {
-            int x = Integer.parseInt(parts[1]);
-            int y = Integer.parseInt(parts[2]);
-            int z = Integer.parseInt(parts[3]);
-            return new Location(world, x, y, z);
-        } catch (NumberFormatException e) {
-            plugin.getLogger().warning("[PrivateChest] Invalid number format in location from data.yml: " + str);
+            try {
+                Files.move(temp.toPath(), dataFile.toPath(),
+                        StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException unsupported) {
+                // Some filesystems (notably certain network mounts) cannot do atomic moves.
+                Files.move(temp.toPath(), dataFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            }
+            return true;
+        } catch (IOException e) {
+            plugin.getLogger().severe("[Storage] Could not replace data.yml: " + e.getMessage());
+            deleteQuietly(temp);
+            return false;
+        }
+    }
+
+    private void deleteQuietly(File file) {
+        try {
+            Files.deleteIfExists(file.toPath());
+        } catch (IOException ignored) {
+            // Nothing useful to do here.
+        }
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) {
             return null;
         }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

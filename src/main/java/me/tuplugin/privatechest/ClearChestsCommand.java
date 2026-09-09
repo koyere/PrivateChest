@@ -1,84 +1,66 @@
 package me.tuplugin.privatechest;
 
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 
-import java.util.Iterator;
-import java.util.Map;
+import java.util.Collections;
+import java.util.List;
 
-public class ClearChestsCommand implements CommandExecutor {
+/**
+ * Removes protection records whose container no longer exists.
+ *
+ * <p>Delegates to the same engine as the automatic cleanup, which verifies each position on the
+ * thread that owns its chunk and skips chunks that are not loaded. The previous implementation read
+ * every recorded position inline, forcing the server to load a chunk for each one, and would fail on
+ * Folia as soon as a record belonged to another region.</p>
+ */
+public class ClearChestsCommand implements CommandExecutor, TabCompleter {
 
     private final PrivateChest plugin;
-    private final DataManager dataManager;
-    private final ChestLocker chestLocker;
     private final MessageManager messages;
 
     public ClearChestsCommand(PrivateChest plugin) {
         this.plugin = plugin;
-        this.dataManager = plugin.getDataManager();
-        this.chestLocker = ChestLocker.getInstance();
         this.messages = plugin.getMessageManager();
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("privatechest.admin")) {
-            sender.sendMessage(messages.raw("no_permission"));
+            messages.send(sender, messages.raw("no_permission"));
             return true;
         }
 
-        sender.sendMessage(messages.raw("cleaning_start")); // Optional: Inform about start
+        messages.send(sender, messages.raw("cleaning_start"));
 
-        int cleared = 0;
-        Map<Location, String> owners = chestLocker.getChestOwners();
-        Map<Location, String> passwords = chestLocker.getChestPasswords();
-
-        // Use an iterator to safely remove elements while looping
-        Iterator<Map.Entry<Location, String>> it = owners.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<Location, String> entry = it.next();
-            Location loc = entry.getKey();
-
-            // Check if the world is loaded. If not, it's orphaned.
-            if (loc.getWorld() == null) {
-                passwords.remove(loc); // Remove from passwords first
-                it.remove(); // Remove from owners
-                cleared++;
-                continue; // Move to the next entry
+        plugin.getAutoCleanupManager().runCleanup(AutoCleanupManager.CleanupType.MANUAL, report -> {
+            if (report.wasAlreadyRunning()) {
+                messages.send(sender, messages.raw("cleanup_already_running"));
+                return;
             }
 
-            Block block = loc.getBlock();
-
-            // Check if the block is no longer a lockable container. If so, it's orphaned.
-            if (!isLockableContainer(block)) {
-                passwords.remove(loc); // Remove from passwords
-                it.remove(); // Remove from owners
-                cleared++;
+            if (report.getCleanedContainers() > 0) {
+                messages.send(sender, messages.raw("cleaned_chests")
+                        .replace("{amount}", String.valueOf(report.getCleanedContainers())));
+            } else {
+                messages.send(sender, messages.raw("no_chests_to_clean"));
             }
-        }
 
-        // Only save if something was cleared to avoid unnecessary disk writes
-        if (cleared > 0) {
-            dataManager.saveData();
-            sender.sendMessage(messages.raw("cleaned_chests").replace("{amount}", String.valueOf(cleared))); // Use 'cleaned_chests' or update 'cleared_chests'
-        } else {
-            sender.sendMessage(messages.raw("no_chests_to_clean")); // Optional: Message if nothing was found
-        }
+            if (report.getSkippedUnloaded() > 0) {
+                messages.send(sender, messages.raw("clean_skipped_unloaded")
+                        .replace("{amount}", String.valueOf(report.getSkippedUnloaded())));
+            }
+        });
 
         return true;
     }
 
-    private boolean isLockableContainer(Block block) {
-        if (block == null) return false;
-        Material type = block.getType();
-        if (type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL) {
-            return true;
-        }
-        // Support all shulker box variants
-        return type.name().contains("SHULKER_BOX");
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        // No arguments to suggest. Returning an empty list also stops the server from falling back to
+        // suggesting online player names.
+        return Collections.emptyList();
     }
 }

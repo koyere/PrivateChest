@@ -17,17 +17,20 @@ console_only_player: "&cThis command can only be used by players."
 not_a_chest: "&cYou must be looking at a Chest or Barrel to use this command."
 # Sent when trying to interact with a chest that isn't locked.
 not_locked: "&eThis container is not locked."
-# Sent when a player tries to interact with a chest they don't own (and isn't admin).
-not_your_chest: "&cYou cannot interact with this container because you are not the owner."
+# Sent when a player tries to use a container they have no access to.
+# Supports {container} and {owner}.
+not_your_chest: "&cThis {container} belongs to {owner}."
 # Generic error for unexpected issues.
 error_generic: "&cAn unexpected error occurred. Please contact an administrator."
+# Used in place of a player name when the name of a stored UUID cannot be resolved.
+unknown_player: "Unknown"
 
 # --- Lock Command (/lockchest) ---
 
 # Sent when /lockchest is used incorrectly.
 usage_lock: "&cUsage: /lockchest <password>"
-# Sent when /lockchest successfully locks a container.
-locked: "&aThis container has been successfully locked."
+# Sent when /lockchest successfully locks a container. {container} is the container type name.
+locked: "&aThis {container} has been locked."
 # Sent when trying to lock an already locked container.
 already_locked: "&eThis container is already locked."
 
@@ -39,6 +42,9 @@ usage_unlock: "&cUsage: /unlockchest <password>"
 unlocked: "&aContainer unlocked successfully!"
 # Sent when the wrong password is provided for /unlockchest.
 wrong_password: "&cIncorrect password. Access denied."
+# Sent when a player has entered too many wrong passwords and must wait.
+# Limits are configured under 'security' in config.yml.
+too_many_attempts: "&cToo many incorrect passwords. Try again in {seconds} second(s)."
 
 # --- Trust System Commands (/trust, /untrust) ---
 
@@ -82,20 +88,29 @@ player_status_online: "&aOnline"
 # Offline status indicator.
 player_status_offline: "&7Offline"
 
-# --- Chest Limit Messages ---
+# --- Container Limit Messages ---
+#
+# {container} is available in all of these and is replaced with the container type name, for example
+# "shulker box". It is only meaningful when per-family limits are enabled
+# (container-limits.enabled in config.yml); with the overall limit it falls back to a generic word.
 
-# Sent when a player tries to lock more chests than their limit allows.
-limit_exceeded: "&cYou cannot lock more chests! Current: {current}/{limit}. You're trying to lock {trying} more."
-# Sent when a player creates a sign but would exceed their limit.
-sign_limit_exceeded: "&cYou cannot create this private sign! Current: {current}/{limit}. This would lock {trying} more chests."
+# Sent when a player would exceed their overall limit.
+limit_exceeded: "&cYou cannot lock any more containers. Using {current}/{limit}, trying to lock {trying} more."
+# Sent when a player would exceed their limit for one container type.
+limit_exceeded_type: "&cYou cannot lock any more of that container type. Using {current}/{limit} {container}, trying to lock {trying} more."
+# Sent when a [Private] sign would exceed the player's overall limit.
+sign_limit_exceeded: "&cThis private sign would take you past your limit. Using {current}/{limit}, it would lock {trying} more."
+# Sent when a [Private] sign would exceed the player's limit for one container type.
+sign_limit_exceeded_type: "&cThis private sign would take you past your limit for that container type. Using {current}/{limit} {container}, it would lock {trying} more."
 # Sent when a player is approaching their limit.
-limit_warning: "&eWarning: You only have {remaining} chest locks remaining out of {limit}."
+limit_warning: "&eYou have {remaining} of {limit} locks remaining."
 # Sent when a player has reached their limit.
-limit_reached: "&cYou have reached your chest locking limit of {limit}!"
-# Sent to show current limit status after locking.
-limit_status: "&7Chest locks used: {status}"
-# Generic limit error message.
-limit_error: "&cThere was an error checking your chest limit. Please contact an administrator."
+limit_reached: "&cYou have reached your limit of {limit}."
+# Sent to show the current limit status after locking.
+limit_status: "&7Locks used: {status}"
+# The word shown instead of a number when a player has no limit.
+limit_unlimited: "Unlimited"
+
 
 # --- Sign Protection Messages ---
 
@@ -103,10 +118,8 @@ limit_error: "&cThere was an error checking your chest limit. Please contact an 
 sign_no_chest_found: "&cNo chest found near this sign. Place the sign on or next to a chest."
 # Sent when trying to create a [Private] sign on an already locked chest.
 sign_chest_already_locked: "&cThis chest is already locked."
-# Sent when trying to create a [Private] sign on a chest owned by someone else.
-sign_not_your_chest: "&cYou cannot create a private sign for someone else's chest."
-# Sent when a chest is successfully locked via sign.
-sign_chest_locked: "&aChest locked successfully with private sign!"
+# Sent when a container is successfully locked via sign. {container} is the container type name.
+sign_chest_locked: "&aThis {container} is now locked with a private sign."
 # Sent when sign-based locking fails.
 sign_lock_failed: "&cFailed to lock chest with sign."
 # Sent when trying to break someone else's private sign.
@@ -126,15 +139,59 @@ cleaned_chests: "&a✔ Cleaned {amount} orphaned container entries."
 # Sent when /clearchests runs but finds no entries to clean.
 no_chests_to_clean: "&aNo orphaned container entries found to clean."
 
-# --- Reload Command (/privatechest reload) ---
+# Sent when some records could not be checked because their chunks are not loaded.
+# These are left untouched on purpose: an unloaded chunk is not proof that the container is gone.
+clean_skipped_unloaded: "&7{amount} record(s) were skipped because their chunks are not loaded."
+# Sent when a cleanup is requested while one is already running.
+cleanup_already_running: "&eA cleanup is already running. Try again in a moment."
 
+# --- Admin Command (/privatechest) ---
+
+# Shown when /privatechest is used without a valid subcommand.
+usage_privatechest: "&eUsage: /privatechest <reload|status|save|migrate>"
 # Sent when the configuration is successfully reloaded.
 reload_success: "&a✔ PrivateChest configuration and messages reloaded successfully."
 
+# --- Admin Command: /privatechest status ---
+
+status_header: "&6=== &ePrivateChest Status &6==="
+status_storage: "&7Storage backend: &f{type}"
+status_containers: "&7Protected containers: &f{amount}"
+status_trust: "&7Trust relations: &f{amount}"
+status_container_types: "&7Protectable container types: &f{amount}"
+status_pending: "&7Unsaved changes: &f{state}"
+status_pending_yes: "&eyes"
+status_pending_no: "&anone"
+
+# --- Admin Command: /privatechest save ---
+
+# Sent when queued changes were written to disk on demand.
+save_success: "&a✔ All pending changes have been written to disk."
+# Sent when the save could not be completed. Check the console for the reason.
+save_failed: "&cCould not write pending changes. See the console for details."
+
+# --- Admin Command: /privatechest migrate ---
+
+# Shown when the migrate subcommand is used without a valid target.
+usage_migrate: "&eUsage: /privatechest migrate <yaml|sqlite>"
+# Sent when a migration begins.
+migrate_started: "&eMigrating storage to {type}. This may take a moment..."
+# Sent when a migration completes. The previous data files are kept as a backup.
+migrate_success: "&a✔ Storage migrated to {type}. The previous data files were kept as a backup."
+# Sent when the requested backend is already the active one.
+migrate_already_active: "&e{type} is already the active storage backend."
+# Sent when a migration failed. The original backend stays in use and is untouched.
+migrate_failed: "&cMigration failed. The current storage backend is unchanged. See the console for details."
+
 # --- Security Protection Messages ---
 
-# Sent when a player tries to place an automated extraction block near a protected container.
-automated_block_placement_denied: "&cYou cannot place {block} near a protected container."
+# Sent when a player tries to place an automated extraction block near a container they cannot use.
+automated_block_placement_denied: "&cYou cannot place {block} next to a container you do not have access to."
+
+# Names used for {block} in the message above. Translate these for your language.
+block_name_hopper: "a hopper"
+block_name_dropper: "a dropper"
+block_name_dispenser: "a dispenser"
 
 # --- Container Renaming Messages ---
 
@@ -160,16 +217,35 @@ name_too_long: "&cContainer name cannot exceed {details} characters."
 name_invalid_characters: "&cContainer name can only contain letters, numbers, spaces, hyphens, and underscores."
 # Sent when the proposed name is forbidden.
 name_forbidden: "&cThis name is not allowed."
+# Used for {container} when the container type cannot be determined.
+container_generic_name: "container"
+
+# --- Container Type Names ---
+
+# Shown for {container} when a container has no custom name.
+# These are grouped by family: all shulker box colours share one name, and every oxidation stage of
+# a copper chest shares one name.
+container_type_chest: "chest"
+container_type_trapped_chest: "trapped chest"
+container_type_copper_chest: "copper chest"
+container_type_barrel: "barrel"
+container_type_shulker_box: "shulker box"
+container_type_crafter: "crafter"
+container_type_other: "container"
 
 # --- Notifications & Warnings ---
 
+# These support {container} and {owner}.
+# {container} is the container's custom name if it has one, set with /renamecontainer, and otherwise
+# the container type name. {owner} is the owner's player name.
+
 # Sent to the owner when they open their own locked container.
-owner_access_notice: "&7(Owner Access)"
+owner_access_notice: "&7(Your {container})"
 # Sent to an admin when they open a locked container using bypass.
-admin_access_notice: "&6(Admin Access)"
+admin_access_notice: "&6(Admin access to {owner}'s {container})"
 # Sent to a trusted player when they open a locked container.
-trusted_access_notice: "&b(Trusted Access)"
+trusted_access_notice: "&b(Trusted access to {owner}'s {container})"
 # Sent to the owner when they break their locked container.
-chest_break_warning: "&eYou broke your locked container."
+chest_break_warning: "&eYou broke your locked {container}."
 # Sent to an admin when they break a locked container.
-admin_chest_break_notice: "&e(Admin) You broke a protected container."
+admin_chest_break_notice: "&e(Admin) You broke {owner}'s protected {container}."

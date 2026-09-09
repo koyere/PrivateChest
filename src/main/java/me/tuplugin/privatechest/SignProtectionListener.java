@@ -3,7 +3,6 @@ package me.tuplugin.privatechest;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
@@ -11,150 +10,146 @@ import org.bukkit.block.Sign;
 import org.bukkit.block.data.type.WallSign;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.SignChangeEvent;
 
+import me.tuplugin.privatechest.container.ContainerFamily;
+import me.tuplugin.privatechest.util.SignCompat;
+
 /**
- * Handles sign-based chest protection.
- * Allows players to lock chests by placing signs with [Private] on them.
+ * Sign-based container protection.
+ *
+ * <p>Writing {@code [Private]} on a sign next to a container locks it, and breaking that sign unlocks
+ * it again. This path shares its limit checking with {@code /lockchest} as of 3.0, so the two can no
+ * longer disagree about what a player is allowed to lock.</p>
  */
 public class SignProtectionListener implements Listener {
+
+    /** The tag a player writes to lock a container. */
+    private static final String PRIVATE_SIGN_TEXT = "[Private]";
+
+    /** How the tag is rewritten once the container is locked. */
+    private static final String PRIVATE_SIGN_FORMATTED = "\u00A74[\u00A7cPrivate\u00A74]";
 
     private final PrivateChest plugin;
     private final ChestLocker chestLocker;
     private final LimitManager limitManager;
     private final MessageManager messages;
 
-    // Constants for sign protection
-    private static final String PRIVATE_SIGN_TEXT = "[Private]";
-    private static final String PRIVATE_SIGN_FORMATTED = "§4[§cPrivate§4]";
-
     public SignProtectionListener(PrivateChest plugin) {
         this.plugin = plugin;
-        this.chestLocker = ChestLocker.getInstance();
-        this.limitManager = LimitManager.getInstance();
+        this.chestLocker = plugin.getChestLocker();
+        this.limitManager = plugin.getLimitManager();
         this.messages = plugin.getMessageManager();
     }
 
-    @EventHandler
+    /**
+     * Locks the nearby container when a player writes the tag on a sign.
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onSignChange(SignChangeEvent event) {
-        // Check if sign protection is enabled
         if (!plugin.getConfig().getBoolean("enable-sign-protection", true)) {
             return;
         }
 
-        Player player = event.getPlayer();
         String[] lines = event.getLines();
-
-        // Check if first line is [Private]
-        if (lines[0] == null || !lines[0].equalsIgnoreCase(PRIVATE_SIGN_TEXT)) {
+        if (lines.length == 0 || lines[0] == null) {
+            return;
+        }
+        if (!SignCompat.stripFormatting(lines[0]).equals(SignCompat.stripFormatting(PRIVATE_SIGN_TEXT))) {
             return;
         }
 
-        // Check permission - sign protection has its own permission, separate from /lockchest
+        Player player = event.getPlayer();
+
+        // Sign protection has its own permission, so blocking /lockchest does not block signs.
         if (!player.hasPermission("privatechest.sign")) {
-            player.sendMessage(messages.raw("no_permission"));
+            messages.send(player, messages.raw("no_permission"));
             event.setCancelled(true);
             return;
         }
 
-        // Find associated chest
         Block signBlock = event.getBlock();
         Set<Block> chestBlocks = findNearbyChests(signBlock);
 
         if (chestBlocks.isEmpty()) {
-            player.sendMessage(messages.get("sign_no_chest_found"));
+            messages.send(player, messages.get("sign_no_chest_found"));
             event.setCancelled(true);
             return;
         }
 
-        // Check if any of the chests are already locked
+        // Count what would actually be locked, and remember one block so the container type is known.
+        int newChestsToLock = 0;
+        Block firstChest = null;
         for (Block chestBlock : chestBlocks) {
             if (chestLocker.isChestLocked(chestBlock)) {
-                player.sendMessage(messages.get("sign_chest_already_locked"));
+                messages.send(player, messages.get("sign_chest_already_locked"));
+                event.setCancelled(true);
+                return;
+            }
+            newChestsToLock++;
+            if (firstChest == null) {
+                firstChest = chestBlock;
+            }
+        }
+
+        // Same limit check as /lockchest, so the two paths cannot disagree.
+        if (firstChest != null) {
+            LimitManager.LimitCheck limitCheck =
+                    limitManager.checkCanLock(player, firstChest.getType(), newChestsToLock);
+            if (!limitCheck.isAllowed()) {
+                messages.send(player, limitManager.getSignDeniedMessage(limitCheck));
                 event.setCancelled(true);
                 return;
             }
         }
 
-        // Check if player owns all nearby chests (if any are locked by others)
-        for (Block chestBlock : chestBlocks) {
-            if (chestLocker.isChestLocked(chestBlock) &&
-                    !chestLocker.isOwner(chestBlock, player) &&
-                    !player.hasPermission("privatechest.admin")) {
-                player.sendMessage(messages.get("sign_not_your_chest"));
-                event.setCancelled(true);
-                return;
-            }
-        }
+        String password = generateSignPassword();
 
-        // Check chest limits (only if not admin)
-        if (!player.hasPermission("privatechest.admin") && limitManager.areLimitsEnabled()) {
-            // Count how many new chests would be locked
-            int newChestsToLock = 0;
-            for (Block chestBlock : chestBlocks) {
-                if (!chestLocker.isChestLocked(chestBlock)) {
-                    newChestsToLock++;
-                }
-            }
-
-            if (newChestsToLock > 0 && !limitManager.canPlayerLockAdditional(player, newChestsToLock)) {
-                int limit = limitManager.getPlayerLimit(player);
-                int current = limitManager.getPlayerChestCount(player);
-
-                player.sendMessage(messages.get("sign_limit_exceeded")
-                        .replace("{current}", String.valueOf(current))
-                        .replace("{limit}", String.valueOf(limit))
-                        .replace("{trying}", String.valueOf(newChestsToLock)));
-                event.setCancelled(true);
-                return;
-            }
-        }
-
-        // Generate a default password for sign-based protection
-        String defaultPassword = generateSignPassword(player, signBlock);
-
-        // Lock all associated chests
         boolean anyLocked = false;
         for (Block chestBlock : chestBlocks) {
-            if (chestLocker.lockChest(chestBlock, player, defaultPassword)) {
+            if (chestLocker.lockChest(chestBlock, player, password)) {
                 anyLocked = true;
             }
         }
 
-        if (anyLocked) {
-            // Save data
-            plugin.getDataManager().saveData();
-
-            // Format the sign
-            event.setLine(0, PRIVATE_SIGN_FORMATTED);
-            event.setLine(1, player.getName());
-            event.setLine(2, ""); // Empty line
-            event.setLine(3, ""); // Empty line
-
-            player.sendMessage(messages.get("sign_chest_locked"));
-
-            // Send limit warning if applicable
-            String warningMessage = limitManager.getLimitWarningMessage(player);
-            if (warningMessage != null) {
-                player.sendMessage(warningMessage);
-            }
-
-            // Show current limit status if limits are enabled
-            if (limitManager.areLimitsEnabled() && !player.hasPermission("privatechest.admin")) {
-                String status = limitManager.getLimitStatus(player);
-                player.sendMessage(messages.get("limit_status").replace("{status}", status));
-            }
-        } else {
-            player.sendMessage(messages.get("sign_lock_failed"));
+        if (!anyLocked) {
+            messages.send(player, messages.get("sign_lock_failed"));
             event.setCancelled(true);
+            return;
+        }
+
+        event.setLine(0, PRIVATE_SIGN_FORMATTED);
+        event.setLine(1, player.getName());
+        event.setLine(2, "");
+        event.setLine(3, "");
+
+        ContainerFamily family = firstChest == null
+                ? null
+                : plugin.getContainerRegistry().getFamily(firstChest.getType());
+
+        messages.send(player, messages.get("sign_chest_locked")
+                .replace("{container}", limitManager.familyName(family)));
+
+        String warningMessage = limitManager.getLimitWarningMessage(player, family);
+        if (warningMessage != null) {
+            messages.send(player, warningMessage);
+        }
+
+        if (limitManager.areLimitsEnabled() && !player.hasPermission("privatechest.admin")) {
+            messages.send(player, messages.get("limit_status")
+                    .replace("{status}", limitManager.getLimitStatus(player, family))
+                    .replace("{container}", limitManager.familyName(family)));
         }
     }
 
-    @EventHandler
+    /**
+     * Unlocks the container when its owner or an admin breaks the sign.
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onSignBreak(BlockBreakEvent event) {
-        // Check if sign protection is enabled
         if (!plugin.getConfig().getBoolean("enable-sign-protection", true)) {
             return;
         }
@@ -162,8 +157,7 @@ public class SignProtectionListener implements Listener {
         Block block = event.getBlock();
         Player player = event.getPlayer();
 
-        // Check if it's a sign
-        if (!isSign(block.getType())) {
+        if (!SignCompat.isSign(block.getType())) {
             return;
         }
 
@@ -172,21 +166,18 @@ public class SignProtectionListener implements Listener {
             return;
         }
 
-        Sign sign = (Sign) state;
-        String[] lines = sign.getLines();
-
-        // Check if it's a private sign
-        if (lines[0] == null || !lines[0].contains("Private")) {
+        // Checks both sides of the sign. Signs have had a writable back since Minecraft 1.20, and
+        // reading only the front meant a tag written on the back was invisible to the plugin.
+        if (!SignCompat.hasTag((Sign) state, PRIVATE_SIGN_TEXT)
+                && !SignCompat.hasTag((Sign) state, PRIVATE_SIGN_FORMATTED)) {
             return;
         }
 
-        // Find associated chests
         Set<Block> chestBlocks = findNearbyChests(block);
         if (chestBlocks.isEmpty()) {
             return;
         }
 
-        // Check if any chest is locked and if player can break the sign
         Block lockedChest = null;
         for (Block chestBlock : chestBlocks) {
             if (chestLocker.isChestLocked(chestBlock)) {
@@ -196,102 +187,71 @@ public class SignProtectionListener implements Listener {
         }
 
         if (lockedChest == null) {
-            return; // No locked chest, allow sign break
-        }
-
-        // Check ownership or admin permission
-        if (!chestLocker.isOwner(lockedChest, player) && !player.hasPermission("privatechest.admin")) {
-            event.setCancelled(true);
-            player.sendMessage(messages.get("sign_cannot_break"));
             return;
         }
 
-        // Allow break and unlock the associated chests
+        if (!chestLocker.isOwner(lockedChest, player) && !player.hasPermission("privatechest.admin")) {
+            event.setCancelled(true);
+            messages.send(player, messages.get("sign_cannot_break"));
+            return;
+        }
+
+        // Ownership is captured before the records are removed. Checking afterwards always reported
+        // "not the owner", so owners were shown the admin notice when breaking their own sign.
+        boolean wasOwner = chestLocker.isOwner(lockedChest, player);
+
         for (Block chestBlock : chestBlocks) {
-            if (chestLocker.isChestLocked(chestBlock)) {
-                chestLocker.removeProtection(chestBlock);
-            }
+            chestLocker.removeProtection(chestBlock);
         }
 
-        // Save data
-        plugin.getDataManager().saveData();
-
-        // Send confirmation
-        if (chestLocker.isOwner(lockedChest, player)) {
-            player.sendMessage(messages.get("sign_chest_unlocked"));
-        } else {
-            player.sendMessage(messages.get("admin_sign_break_notice"));
-        }
+        messages.send(player, wasOwner
+                ? messages.get("sign_chest_unlocked")
+                : messages.get("admin_sign_break_notice"));
     }
 
     /**
-     * Finds chests near a sign block.
+     * Finds the containers a sign could be protecting: the block it is attached to, the block below,
+     * and the four horizontal neighbours.
      */
     private Set<Block> findNearbyChests(Block signBlock) {
         Set<Block> chestBlocks = new HashSet<>();
 
-        // Check block the sign is attached to (for wall signs)
         if (signBlock.getBlockData() instanceof WallSign) {
             WallSign wallSign = (WallSign) signBlock.getBlockData();
-            BlockFace facing = wallSign.getFacing().getOppositeFace();
-            Block attachedBlock = signBlock.getRelative(facing);
-
-            if (isLockableContainer(attachedBlock.getType())) {
-                chestBlocks.addAll(getContainerBlocks(attachedBlock));
-            }
+            Block attachedBlock = signBlock.getRelative(wallSign.getFacing().getOppositeFace());
+            addContainer(chestBlocks, attachedBlock);
         }
 
-        // Check block below (for signs on top of chests)
-        Block blockBelow = signBlock.getRelative(BlockFace.DOWN);
-        if (isLockableContainer(blockBelow.getType())) {
-            chestBlocks.addAll(getContainerBlocks(blockBelow));
-        }
+        addContainer(chestBlocks, signBlock.getRelative(BlockFace.DOWN));
 
-        // Check adjacent blocks (in all 4 horizontal directions)
-        BlockFace[] horizontalFaces = {BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST};
-        for (BlockFace face : horizontalFaces) {
-            Block adjacent = signBlock.getRelative(face);
-            if (isLockableContainer(adjacent.getType())) {
-                chestBlocks.addAll(getContainerBlocks(adjacent));
-            }
+        for (BlockFace face : new BlockFace[]{BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST}) {
+            addContainer(chestBlocks, signBlock.getRelative(face));
         }
 
         return chestBlocks;
     }
 
-    /**
-     * Gets all blocks belonging to a container (handles double chests).
-     */
-    private Set<Block> getContainerBlocks(Block block) {
-        return ContainerUtils.getContainerBlocks(block);
+    private void addContainer(Set<Block> target, Block candidate) {
+        if (ContainerUtils.isLockableContainer(candidate.getType())) {
+            target.addAll(ContainerUtils.getContainerBlocks(candidate));
+        }
     }
 
     /**
-     * Checks if a material is a lockable container.
+     * Generates an unguessable password for a sign-locked container.
+     *
+     * <p>Nobody ever types this. Sign protection identifies the owner by UUID, and the password only
+     * exists because every protection record carries one.</p>
      */
-    private boolean isLockableContainer(Material type) {
-        return ContainerUtils.isLockableContainer(type);
-    }
-
-    /**
-     * Generates a cryptographically secure password for sign-based protection.
-     * Uses SecureRandom for unpredictable passwords.
-     */
-    private String generateSignPassword(Player player, Block signBlock) {
+    private String generateSignPassword() {
         java.security.SecureRandom random = new java.security.SecureRandom();
         byte[] bytes = new byte[16];
         random.nextBytes(bytes);
+
         StringBuilder sb = new StringBuilder("sign_");
         for (byte b : bytes) {
             sb.append(String.format("%02x", b));
         }
         return sb.toString();
-    }
-
-    /**
-     * Checks if a material is a sign.
-     */
-    private boolean isSign(Material material) {
-        return material.name().contains("SIGN");
     }
 }

@@ -1,222 +1,182 @@
 package me.tuplugin.privatechest;
 
-import me.tuplugin.privatechest.enums.ContainerType;
+import me.tuplugin.privatechest.container.ContainerFamily;
+import me.tuplugin.privatechest.storage.Protection;
+import me.tuplugin.privatechest.storage.ProtectionKey;
+import me.tuplugin.privatechest.storage.ProtectionStore;
 import org.bukkit.Location;
-import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 
-import java.util.Collections;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 /**
- * Manages custom names for protected containers.
- * Provides functionality to assign, retrieve, and validate container names
- * while maintaining data consistency and security.
- * 
- * This is a basic implementation suitable for the free version of PrivateChest.
- * Names are limited to alphanumeric characters and basic length restrictions.
- * 
- * @since 2.1
- * @author PrivateChest Team
+ * Custom names for protected containers.
+ *
+ * <p>Names are part of the protection record as of 3.0 instead of living in a separate map. Two
+ * problems go away with that: names were lost entirely on the SQLite backend, and saving a name used
+ * the Bukkit async scheduler directly, which fails on Folia and could race with other writes to
+ * data.yml. Names are now persisted by the same worker as everything else.</p>
+ *
+ * @since 2.1, reworked in 3.0
  */
 public class ContainerNameManager {
 
-    private final PrivateChest plugin;
-    private final ChestLocker chestLocker;
-    private final Map<Location, String> containerNames;
-
-    // Configuration constants
     private static final int MAX_NAME_LENGTH = 16;
     private static final int MIN_NAME_LENGTH = 1;
     private static final Pattern VALID_NAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_\\-\\s]+$");
 
-    // Forbidden names to prevent confusion
+    /** Names that would be confusing or misleading on a container label. */
     private static final String[] FORBIDDEN_NAMES = {
-        "null", "undefined", "admin", "console", "system", "server", 
-        "privatechest", "chest", "container", "locked", "protected"
+            "null", "undefined", "admin", "console", "system", "server",
+            "privatechest", "chest", "container", "locked", "protected"
     };
 
-    /**
-     * Constructs a new ContainerNameManager.
-     * 
-     * @param plugin The main plugin instance
-     */
-    public ContainerNameManager(PrivateChest plugin) {
+    private final PrivateChest plugin;
+    private final ProtectionStore store;
+
+    public ContainerNameManager(PrivateChest plugin, ProtectionStore store) {
         this.plugin = plugin;
-        this.chestLocker = plugin.getChestLocker();
-        this.containerNames = new ConcurrentHashMap<>();
+        this.store = store;
     }
 
     /**
-     * Sets a custom name for a container.
-     * The container must be protected and owned by the player to be renamed.
-     * 
-     * @param location The location of the container
-     * @param player The player attempting to set the name
-     * @param name The desired name for the container
-     * @return A result indicating success or failure with details
+     * Assigns a custom name to a protected container.
+     *
+     * @return the outcome, including the message key to show the player
      */
     public NameResult setContainerName(Location location, Player player, String name) {
-        // Validate container exists and is protected
-        Block block = location.getBlock();
-        if (!chestLocker.isChestLocked(block)) {
+        ProtectionKey key = ProtectionKey.of(location);
+        if (key == null) {
             return new NameResult(false, "container_not_protected");
         }
 
-        // Validate ownership (allow admins to override)
-        if (!chestLocker.isOwner(block, player) && !player.hasPermission("privatechest.admin")) {
+        Protection protection = store.get(key);
+        if (protection == null) {
+            return new NameResult(false, "container_not_protected");
+        }
+
+        if (!protection.isOwnedBy(player.getUniqueId()) && !player.hasPermission("privatechest.admin")) {
             return new NameResult(false, "container_not_owned");
         }
 
-        // Validate the proposed name
         NameValidationResult validation = validateName(name);
         if (!validation.isValid()) {
             return new NameResult(false, validation.getErrorKey(), validation.getErrorDetails());
         }
 
-        // Set the name
-        containerNames.put(location.clone(), name.trim());
+        String trimmed = name.trim();
+        store.replace(key, protection.withCustomName(trimmed));
 
-        // Save data asynchronously to prevent lag
-        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
-            plugin.getDataManager().saveData();
-        });
-
-        plugin.getLogger().fine(String.format(
-            "[ContainerNames] Player %s named container at %s:%d,%d,%d as '%s'",
-            player.getName(),
-            location.getWorld() != null ? location.getWorld().getName() : "null",
-            location.getBlockX(),
-            location.getBlockY(),
-            location.getBlockZ(),
-            name
-        ));
+        if (plugin.getLogger().isLoggable(java.util.logging.Level.FINE)) {
+            plugin.getLogger().fine("[Names] " + player.getName() + " named the container at "
+                    + key.serialize() + " '" + trimmed + "'.");
+        }
 
         return new NameResult(true, "container_name_set");
     }
 
     /**
-     * Removes a custom name from a container.
-     * 
-     * @param location The location of the container
-     * @param player The player attempting to remove the name
-     * @return A result indicating success or failure with details
+     * Clears the custom name of a protected container.
      */
     public NameResult removeContainerName(Location location, Player player) {
-        // Validate container exists and is protected
-        Block block = location.getBlock();
-        if (!chestLocker.isChestLocked(block)) {
+        ProtectionKey key = ProtectionKey.of(location);
+        if (key == null) {
             return new NameResult(false, "container_not_protected");
         }
 
-        // Validate ownership (allow admins to override)
-        if (!chestLocker.isOwner(block, player) && !player.hasPermission("privatechest.admin")) {
+        Protection protection = store.get(key);
+        if (protection == null) {
+            return new NameResult(false, "container_not_protected");
+        }
+
+        if (!protection.isOwnedBy(player.getUniqueId()) && !player.hasPermission("privatechest.admin")) {
             return new NameResult(false, "container_not_owned");
         }
 
-        // Check if container has a name to remove
-        if (!hasCustomName(location)) {
+        if (protection.getCustomName() == null) {
             return new NameResult(false, "container_no_custom_name");
         }
 
-        String oldName = containerNames.remove(location);
+        store.replace(key, protection.withCustomName(null));
 
-        // Save data asynchronously
-        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
-            plugin.getDataManager().saveData();
-        });
-
-        plugin.getLogger().fine(String.format(
-            "[ContainerNames] Player %s removed name '%s' from container at %s:%d,%d,%d",
-            player.getName(),
-            oldName,
-            location.getWorld() != null ? location.getWorld().getName() : "null",
-            location.getBlockX(),
-            location.getBlockY(),
-            location.getBlockZ()
-        ));
+        if (plugin.getLogger().isLoggable(java.util.logging.Level.FINE)) {
+            plugin.getLogger().fine("[Names] " + player.getName() + " cleared the name of the container at "
+                    + key.serialize() + ".");
+        }
 
         return new NameResult(true, "container_name_removed");
     }
 
     /**
-     * Gets the custom name of a container.
-     * 
-     * @param location The location of the container
-     * @return The custom name, or null if no custom name is set
+     * The custom name of a container, or null if it has none or is not protected.
      */
     public String getContainerName(Location location) {
-        return containerNames.get(location);
+        Protection protection = store.get(ProtectionKey.of(location));
+        return protection == null ? null : protection.getCustomName();
     }
 
     /**
-     * Gets the display name of a container.
-     * This returns the custom name if set, otherwise a default name based on the container type.
-     * 
-     * @param location The location of the container
-     * @return The display name (never null)
-     */
-    public String getDisplayName(Location location) {
-        String customName = getContainerName(location);
-        if (customName != null) {
-            return customName;
-        }
-
-        // Fall back to type-based name
-        if (location.getWorld() != null) {
-            Block block = location.getBlock();
-            ContainerType type = ContainerType.fromMaterial(block.getType());
-            if (type != null) {
-                return type.getDisplayName();
-            }
-        }
-
-        return "Container";
-    }
-
-    /**
-     * Checks if a container has a custom name.
-     * 
-     * @param location The location of the container
-     * @return true if the container has a custom name
+     * Whether a container has a custom name.
      */
     public boolean hasCustomName(Location location) {
-        return containerNames.containsKey(location);
+        return getContainerName(location) != null;
     }
 
     /**
-     * Validates a proposed container name.
-     * 
-     * @param name The name to validate
-     * @return A validation result with details
+     * The custom name if set, otherwise the container's type name, otherwise null.
+     *
+     * <p>Answered from the protection record only, never by reading the block, so it is safe to call
+     * from any thread and from any region. Callers provide their own translated fallback.</p>
      */
+    public String getDisplayName(Location location) {
+        Protection protection = store.get(ProtectionKey.of(location));
+        if (protection == null) {
+            return null;
+        }
+
+        if (protection.getCustomName() != null) {
+            return protection.getCustomName();
+        }
+
+        // No custom name: fall back to the translated name of the container's family.
+        ContainerFamily family = plugin.getContainerRegistry().getFamilyFromName(protection.getContainerType());
+        if (family == null) {
+            return null;
+        }
+        return plugin.getMessageManager().rawOrNull("container_type_" + family.getConfigName());
+    }
+
+    /**
+     * Number of protected containers that carry a custom name.
+     */
+    public int getNamedContainerCount() {
+        int count = 0;
+        for (Protection protection : store.view().values()) {
+            if (protection.getCustomName() != null) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    // --- Validation ---
+
     private NameValidationResult validateName(String name) {
-        // Check for null or empty
         if (name == null || name.trim().isEmpty()) {
             return new NameValidationResult(false, "name_empty");
         }
 
         String trimmedName = name.trim();
 
-        // Check length constraints
         if (trimmedName.length() < MIN_NAME_LENGTH) {
-            return new NameValidationResult(false, "name_too_short", 
-                String.valueOf(MIN_NAME_LENGTH));
+            return new NameValidationResult(false, "name_too_short", String.valueOf(MIN_NAME_LENGTH));
         }
-
         if (trimmedName.length() > MAX_NAME_LENGTH) {
-            return new NameValidationResult(false, "name_too_long", 
-                String.valueOf(MAX_NAME_LENGTH));
+            return new NameValidationResult(false, "name_too_long", String.valueOf(MAX_NAME_LENGTH));
         }
-
-        // Check character restrictions (alphanumeric, spaces, hyphens, underscores only)
         if (!VALID_NAME_PATTERN.matcher(trimmedName).matches()) {
             return new NameValidationResult(false, "name_invalid_characters");
         }
-
-        // Check forbidden names
         for (String forbidden : FORBIDDEN_NAMES) {
             if (trimmedName.equalsIgnoreCase(forbidden)) {
                 return new NameValidationResult(false, "name_forbidden");
@@ -227,52 +187,7 @@ public class ContainerNameManager {
     }
 
     /**
-     * Gets all container names (for storage and debugging purposes).
-     * Returns an unmodifiable view to prevent external modification.
-     * 
-     * @return An unmodifiable map of all container names
-     */
-    public Map<Location, String> getAllContainerNames() {
-        return Collections.unmodifiableMap(containerNames);
-    }
-
-    /**
-     * Loads container names from the provided map.
-     * This is typically called during plugin initialization.
-     * 
-     * @param names The map of container names to load
-     */
-    public void loadContainerNames(Map<Location, String> names) {
-        containerNames.clear();
-        if (names != null) {
-            containerNames.putAll(names);
-        }
-        
-        plugin.getLogger().info("[ContainerNames] Loaded " + containerNames.size() + " custom container names");
-    }
-
-    /**
-     * Removes a container name entry (used during cleanup).
-     * This method is package-private and intended for use by cleanup operations.
-     * 
-     * @param location The location to remove
-     * @return true if a name was removed
-     */
-    boolean removeContainerNameEntry(Location location) {
-        return containerNames.remove(location) != null;
-    }
-
-    /**
-     * Gets the total number of named containers.
-     * 
-     * @return The count of containers with custom names
-     */
-    public int getNamedContainerCount() {
-        return containerNames.size();
-    }
-
-    /**
-     * Result class for name operations.
+     * Outcome of a naming operation.
      */
     public static class NameResult {
         private final boolean success;
@@ -289,31 +204,44 @@ public class ContainerNameManager {
             this.details = details;
         }
 
-        public boolean isSuccess() { return success; }
-        public String getMessageKey() { return messageKey; }
-        public String getDetails() { return details; }
+        public boolean isSuccess() {
+            return success;
+        }
+
+        public String getMessageKey() {
+            return messageKey;
+        }
+
+        public String getDetails() {
+            return details;
+        }
     }
 
-    /**
-     * Result class for name validation.
-     */
     private static class NameValidationResult {
         private final boolean valid;
         private final String errorKey;
         private final String errorDetails;
 
-        public NameValidationResult(boolean valid, String errorKey) {
+        NameValidationResult(boolean valid, String errorKey) {
             this(valid, errorKey, null);
         }
 
-        public NameValidationResult(boolean valid, String errorKey, String errorDetails) {
+        NameValidationResult(boolean valid, String errorKey, String errorDetails) {
             this.valid = valid;
             this.errorKey = errorKey;
             this.errorDetails = errorDetails;
         }
 
-        public boolean isValid() { return valid; }
-        public String getErrorKey() { return errorKey; }
-        public String getErrorDetails() { return errorDetails; }
+        boolean isValid() {
+            return valid;
+        }
+
+        String getErrorKey() {
+            return errorKey;
+        }
+
+        String getErrorDetails() {
+            return errorDetails;
+        }
     }
 }

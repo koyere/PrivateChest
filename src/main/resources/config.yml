@@ -15,9 +15,27 @@
 # YAML: Simple file-based storage, good for small to medium servers.
 # SQLite: Database storage, better performance for large servers with many locked chests.
 #
-# Note: You can migrate between storage types using the /privatechest migrate command.
+# You can move all existing data between backends at any time with:
+#   /privatechest migrate <yaml|sqlite>
+# The migration keeps the old files in place as a backup and updates this setting for you.
 # Default: yaml
 storage-type: yaml
+
+# How often, in seconds, pending changes are written to disk.
+#
+# Changes are no longer written one by one while players are locking and unlocking containers.
+# They are collected in memory and written by a background thread on this interval, which is what
+# keeps busy servers from stuttering on every lock, break or /trust.
+#
+# Lower values write more often and lose less on a hard crash.
+# Higher values write less often. A crash can lose up to this many seconds of changes.
+# Anything above 300 is rejected, and 0 or less falls back to the default.
+#
+# A clean shutdown or restart always writes everything, regardless of this setting.
+# You can also force a write at any time with /privatechest save.
+#
+# Default: 5
+save-interval-seconds: 5
 
 # --- Message Prefix Settings ---
 
@@ -28,6 +46,51 @@ use-prefix: true
 # The prefix to display before messages (only if 'use-prefix' is true).
 # Default: "&7[&6PrivateChest&7] "
 prefix: "&7[&6PrivateChest&7] "
+
+# --- Protectable Containers ---
+
+# Which blocks players are allowed to protect.
+#
+# The plugin already knows about every vanilla container: chests, trapped chests, barrels, all
+# shulker box colours, crafters, and copper chests including every oxidation and waxed stage.
+# Entries that do not exist on your Minecraft version are simply skipped, so this same list works
+# on 1.16 and on the latest release.
+containers:
+  # Automatically protect containers this plugin version has never heard of, matched by name.
+  # This is what lets a container added by a future Minecraft update be protectable on day one,
+  # without waiting for a plugin update. Turn it off if you want an exact, fixed list.
+  # Default: true
+  auto-discover: true
+
+  # Name patterns used by auto-discover. '*' matches any text.
+  # Only block materials are considered.
+  # Default: ["*_CHEST", "*_SHULKER_BOX"]
+  discovery-patterns:
+    - "*_CHEST"
+    - "*_SHULKER_BOX"
+
+  # Extra containers to allow, by material name. Use this to protect things the plugin does not
+  # cover by default, for example:
+  #   - FURNACE
+  #   - BLAST_FURNACE
+  #   - SMOKER
+  #   - BREWING_STAND
+  additional: []
+
+  # Containers players must never be able to protect, even if a pattern matches them.
+  # ENDER_CHEST is here because it is already private to each player; protecting one only breaks it.
+  # Default: ["ENDER_CHEST"]
+  excluded:
+    - "ENDER_CHEST"
+
+  # Containers to stop allowing, by material name. Existing protections on these are left alone.
+  # Example: disallow new shulker box locks without touching the ones players already have.
+  disabled: []
+
+  # Log which known containers are not available on this server version, at startup.
+  # Only useful when troubleshooting; it is normal for an older server to be missing newer ones.
+  # Default: false
+  log-unavailable: false
 
 # --- Feature Settings ---
 
@@ -60,32 +123,61 @@ container-limits:
   # Default: 5
   default-limit: 5
   
-  # Specific limits by container type
-  # Players need specific permissions to exceed these defaults
+  # Limits per container family.
+  #
+  # Families group containers that are the same thing to a player. All seventeen shulker box colours
+  # count as 'shulker_box', and every oxidation and waxed stage of a copper chest counts as
+  # 'copper_chest'. That matters because a copper chest changes material as it weathers: keying
+  # limits on the family means a player's count does not shift when their chests oxidize.
+  #
+  # Players need a permission to exceed these defaults:
+  #   privatechest.limit.<family>.<number>   or   privatechest.limit.<family>.unlimited
   types:
-    # Standard containers
     chest: 10
     trapped_chest: 5
+    copper_chest: 10
     barrel: 5
-    
-    # Shulker boxes (more valuable, lower limits)
+    crafter: 5
+
+    # Shulker boxes hold more value per block, so a lower default is usual.
     shulker_box: 2
-    white_shulker_box: 1
-    orange_shulker_box: 1
-    magenta_shulker_box: 1
-    light_blue_shulker_box: 1
-    yellow_shulker_box: 1
-    lime_shulker_box: 1
-    pink_shulker_box: 1
-    gray_shulker_box: 1
-    light_gray_shulker_box: 1
-    cyan_shulker_box: 1
-    purple_shulker_box: 1
-    blue_shulker_box: 1
-    brown_shulker_box: 1
-    green_shulker_box: 1
-    red_shulker_box: 1
-    black_shulker_box: 1
+
+    # Anything added through 'containers.additional' that is not one of the families above.
+    other: 5
+
+# --- Security Settings ---
+
+security:
+  # How many rounds of PBKDF2 are used to hash container passwords.
+  #
+  # Higher values make a stolen data file harder to attack offline, and make /unlockchest take
+  # slightly longer. The cost is paid once per command, so it is not a performance concern at
+  # normal values.
+  #
+  # Existing passwords are upgraded automatically the next time they are entered correctly, so
+  # raising this strengthens old passwords over time without any migration step.
+  #
+  # Allowed range: 1000 to 1000000. Values outside it are clamped.
+  # Default: 20000
+  password-hash-iterations: 20000
+
+  # How many wrong passwords a player may enter before being made to wait.
+  # Default: 5
+  max-password-attempts: 5
+
+  # How long wrong attempts are remembered, in seconds. Attempts older than this do not count
+  # towards the limit above.
+  # Default: 60
+  attempt-window-seconds: 60
+
+  # How long a player must wait after hitting the limit, in seconds.
+  # Default: 300 (5 minutes)
+  lockout-seconds: 300
+
+  # Log wrong password attempts to the console, with the player name and container position.
+  # Useful for spotting someone probing other players' containers.
+  # Default: true
+  log-failed-attempts: true
 
 # --- Notification Settings ---
 
@@ -110,12 +202,44 @@ notify-trusted-on-open: true
 # This helps maintain database integrity and performance by removing
 # data for containers that no longer exist in the world.
 auto-cleanup:
-  # Enable periodic automatic cleanup (every 30 minutes)
+  # Run a pass shortly after the server starts.
+  # Default: true
+  startup-enabled: true
+
+  # How long after startup to wait, in seconds. Give world managers time to mount their worlds.
+  # Default: 10
+  startup-delay-seconds: 10
+
+  # Run a pass periodically while the server is up.
   # Default: true
   periodic-enabled: true
 
-  # Startup cleanup is always performed regardless of this setting
-  # This setting only controls the periodic cleanup task
+  # Minutes between periodic passes. Set to 0 to disable them.
+  # Default: 30
+  interval-minutes: 30
+
+  # How many chunks a periodic pass will examine. A large dataset is spread over several passes
+  # rather than checked all at once. Set to 0 for no limit.
+  # Default: 200
+  max-chunks-per-pass: 200
+
+  # How many chunks are examined per tick on single-threaded servers. Lower is gentler.
+  # Ignored on Folia, where each chunk is handled by the thread that owns it.
+  # Default: 20
+  chunks-per-tick: 20
+
+  # Delete a player's trusted list when they own no protected containers.
+  #
+  # OFF by default, and that is a deliberate change from 2.x, which always did this and quietly
+  # destroyed real data: a player who ran /trust before locking their first container lost the whole
+  # list within half an hour, and so did anyone who temporarily broke all of their containers.
+  #
+  # Trust relations are a few bytes each. There is very little reason to turn this on.
+  # Default: false
+  remove-unused-trust: false
+
+# Positions in chunks that are not loaded are never touched by any cleanup pass, on any setting.
+# An unloaded chunk is not evidence that a container is gone.
 
 # --- Hopper Protection Settings ---
 

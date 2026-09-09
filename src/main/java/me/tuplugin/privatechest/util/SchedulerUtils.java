@@ -2,205 +2,316 @@ package me.tuplugin.privatechest.util;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 
+import java.lang.reflect.Method;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+
 /**
- * Utility class for scheduling tasks with Folia compatibility.
- * Automatically detects if running on Folia and uses appropriate scheduler.
- * 
- * On standard Bukkit/Spigot/Paper: Uses BukkitScheduler
- * On Folia: Uses GlobalRegionScheduler for global tasks
- * 
- * @since 2.3
+ * Single entry point for scheduling work, on both standard servers and Folia-based ones.
+ *
+ * <p>Folia replaces the single main thread with independently ticking regions. A plugin may only
+ * touch a block from the thread that owns the region containing it, which means "run this on the main
+ * thread" is not a meaningful instruction there. Every scheduling decision in the plugin goes through
+ * this class so the right scheduler is always used:</p>
+ * <ul>
+ *     <li>{@link #runGlobal} for work that belongs to no particular location</li>
+ *     <li>{@link #runAtChunk} and {@link #runAtLocation} for anything that reads or writes blocks</li>
+ *     <li>{@link #runAsync} and {@link #runTimerAsync} for work that never touches the world</li>
+ * </ul>
+ *
+ * <p>Reflection is resolved once at class load instead of on every call, and every scheduling method
+ * returns a {@link Task} that can be cancelled on either platform. Folia tasks were previously
+ * impossible to cancel, so repeating work kept running after the plugin was disabled.</p>
+ *
+ * @since 2.3, reworked in 3.0
  */
 public final class SchedulerUtils {
 
-    private static Boolean isFolia = null;
+    private static final boolean FOLIA;
+
+    // Folia reflection handles, resolved once. Null on standard servers.
+    private static Method getGlobalRegionScheduler;
+    private static Method globalRun;
+    private static Method globalRunDelayed;
+    private static Method getAsyncScheduler;
+    private static Method asyncRunNow;
+    private static Method asyncRunAtFixedRate;
+    private static Method getRegionScheduler;
+    private static Method regionExecuteChunk;
+    private static Method regionExecuteLocation;
+    private static Method scheduledTaskCancel;
+
+    static {
+        boolean folia;
+        try {
+            Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
+            folia = true;
+        } catch (ClassNotFoundException e) {
+            folia = false;
+        }
+        FOLIA = folia;
+
+        if (FOLIA) {
+            try {
+                resolveFoliaMethods();
+            } catch (Exception e) {
+                // Leave the handles null; every method falls back to the Bukkit scheduler and logs.
+                Bukkit.getLogger().warning("[PrivateChest] Folia was detected but its schedulers could not be "
+                        + "resolved (" + e.getMessage() + "). Falling back to the standard scheduler.");
+            }
+        }
+    }
 
     private SchedulerUtils() {
-        // Utility class - prevent instantiation
+        // Utility class.
+    }
+
+    private static void resolveFoliaMethods() throws Exception {
+        Class<?> scheduledTask = Class.forName("io.papermc.paper.threadedregions.scheduler.ScheduledTask");
+        scheduledTaskCancel = scheduledTask.getMethod("cancel");
+
+        Class<?> globalScheduler = Class.forName(
+                "io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler");
+        getGlobalRegionScheduler = Bukkit.class.getMethod("getGlobalRegionScheduler");
+        globalRun = globalScheduler.getMethod("run", Plugin.class, Consumer.class);
+        globalRunDelayed = globalScheduler.getMethod("runDelayed", Plugin.class, Consumer.class, long.class);
+
+        Class<?> asyncScheduler = Class.forName("io.papermc.paper.threadedregions.scheduler.AsyncScheduler");
+        getAsyncScheduler = Bukkit.class.getMethod("getAsyncScheduler");
+        asyncRunNow = asyncScheduler.getMethod("runNow", Plugin.class, Consumer.class);
+        asyncRunAtFixedRate = asyncScheduler.getMethod("runAtFixedRate", Plugin.class, Consumer.class,
+                long.class, long.class, TimeUnit.class);
+
+        Class<?> regionScheduler = Class.forName("io.papermc.paper.threadedregions.scheduler.RegionScheduler");
+        getRegionScheduler = Bukkit.class.getMethod("getRegionScheduler");
+        regionExecuteChunk = regionScheduler.getMethod("execute", Plugin.class, World.class,
+                int.class, int.class, Runnable.class);
+        regionExecuteLocation = regionScheduler.getMethod("execute", Plugin.class, Location.class, Runnable.class);
     }
 
     /**
-     * Checks if the server is running Folia.
-     * Result is cached after first check.
-     * 
-     * @return true if running on Folia
+     * Whether this server splits the world into independently ticking regions.
      */
     public static boolean isFolia() {
-        if (isFolia == null) {
-            try {
-                Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
-                isFolia = true;
-            } catch (ClassNotFoundException e) {
-                isFolia = false;
-            }
-        }
-        return isFolia;
+        return FOLIA;
     }
 
+    // --- Global / main thread ---
+
     /**
-     * Runs a task on the main thread (or global region for Folia).
-     * 
-     * @param plugin The plugin instance
-     * @param task The task to run
+     * Runs a task where global server state is safe to touch: the main thread on standard servers,
+     * the global region on Folia. Not valid for reading or writing blocks on Folia.
      */
-    public static void runTask(Plugin plugin, Runnable task) {
-        if (isFolia()) {
+    public static Task runGlobal(Plugin plugin, Runnable task) {
+        if (FOLIA && globalRun != null) {
             try {
-                // Use Folia's global region scheduler
-                Object globalScheduler = Bukkit.class.getMethod("getGlobalRegionScheduler").invoke(null);
-                globalScheduler.getClass().getMethod("run", Plugin.class, java.util.function.Consumer.class)
-                    .invoke(globalScheduler, plugin, (java.util.function.Consumer<Object>) (t) -> task.run());
+                Object scheduler = getGlobalRegionScheduler.invoke(null);
+                Object handle = globalRun.invoke(scheduler, plugin, asConsumer(task));
+                return new FoliaTask(handle);
             } catch (Exception e) {
-                // Fallback to standard scheduler if reflection fails
-                Bukkit.getScheduler().runTask(plugin, task);
+                warn(plugin, "global task", e);
             }
-        } else {
-            Bukkit.getScheduler().runTask(plugin, task);
         }
+        return new BukkitTaskHandle(Bukkit.getScheduler().runTask(plugin, task));
     }
 
     /**
-     * Runs a task later on the main thread (or global region for Folia).
-     * 
-     * @param plugin The plugin instance
-     * @param task The task to run
-     * @param delayTicks Delay in ticks before running
+     * Runs a task after a delay, on the main thread or the global region.
      */
-    public static void runTaskLater(Plugin plugin, Runnable task, long delayTicks) {
-        if (isFolia()) {
+    public static Task runGlobalLater(Plugin plugin, Runnable task, long delayTicks) {
+        long delay = Math.max(1L, delayTicks);
+        if (FOLIA && globalRunDelayed != null) {
             try {
-                Object globalScheduler = Bukkit.class.getMethod("getGlobalRegionScheduler").invoke(null);
-                globalScheduler.getClass().getMethod("runDelayed", Plugin.class, java.util.function.Consumer.class, long.class)
-                    .invoke(globalScheduler, plugin, (java.util.function.Consumer<Object>) (t) -> task.run(), delayTicks);
+                Object scheduler = getGlobalRegionScheduler.invoke(null);
+                Object handle = globalRunDelayed.invoke(scheduler, plugin, asConsumer(task), delay);
+                return new FoliaTask(handle);
             } catch (Exception e) {
-                Bukkit.getScheduler().runTaskLater(plugin, task, delayTicks);
+                warn(plugin, "delayed global task", e);
             }
-        } else {
-            Bukkit.getScheduler().runTaskLater(plugin, task, delayTicks);
         }
+        return new BukkitTaskHandle(Bukkit.getScheduler().runTaskLater(plugin, task, delay));
     }
 
+    // --- Region aware ---
+
     /**
-     * Runs a task asynchronously.
-     * Works the same on both Folia and standard servers.
-     * 
-     * @param plugin The plugin instance
-     * @param task The task to run
+     * Runs a task on the thread that owns the given chunk, which is the only place its blocks may be
+     * touched on Folia.
+     *
+     * <p>On Folia, if that region is not ticking yet the task waits until it is. It does not force the
+     * chunk to load, so callers still have to check that the chunk is loaded once the task runs.</p>
      */
-    public static void runTaskAsync(Plugin plugin, Runnable task) {
-        if (isFolia()) {
+    public static void runAtChunk(Plugin plugin, World world, int chunkX, int chunkZ, Runnable task) {
+        if (FOLIA && regionExecuteChunk != null) {
             try {
-                Object asyncScheduler = Bukkit.class.getMethod("getAsyncScheduler").invoke(null);
-                asyncScheduler.getClass().getMethod("runNow", Plugin.class, java.util.function.Consumer.class)
-                    .invoke(asyncScheduler, plugin, (java.util.function.Consumer<Object>) (t) -> task.run());
+                Object scheduler = getRegionScheduler.invoke(null);
+                regionExecuteChunk.invoke(scheduler, plugin, world, chunkX, chunkZ, task);
+                return;
             } catch (Exception e) {
-                Bukkit.getScheduler().runTaskAsynchronously(plugin, task);
+                warn(plugin, "region task", e);
             }
-        } else {
-            Bukkit.getScheduler().runTaskAsynchronously(plugin, task);
         }
+        Bukkit.getScheduler().runTask(plugin, task);
     }
 
     /**
-     * Runs a repeating task asynchronously.
-     * 
-     * @param plugin The plugin instance
-     * @param task The task to run
-     * @param delayTicks Initial delay in ticks
-     * @param periodTicks Period between executions in ticks
-     * @return BukkitTask on standard servers, null on Folia (use cancelTask instead)
-     */
-    public static BukkitTask runTaskTimerAsync(Plugin plugin, Runnable task, long delayTicks, long periodTicks) {
-        if (isFolia()) {
-            try {
-                Object asyncScheduler = Bukkit.class.getMethod("getAsyncScheduler").invoke(null);
-                // Convert ticks to TimeUnit for Folia
-                long delayMs = delayTicks * 50; // 1 tick = 50ms
-                long periodMs = periodTicks * 50;
-                asyncScheduler.getClass().getMethod("runAtFixedRate", Plugin.class, java.util.function.Consumer.class, 
-                    long.class, long.class, java.util.concurrent.TimeUnit.class)
-                    .invoke(asyncScheduler, plugin, (java.util.function.Consumer<Object>) (t) -> task.run(), 
-                        delayMs, periodMs, java.util.concurrent.TimeUnit.MILLISECONDS);
-                return null; // Folia doesn't return BukkitTask
-            } catch (Exception e) {
-                return Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, task, delayTicks, periodTicks);
-            }
-        } else {
-            return Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, task, delayTicks, periodTicks);
-        }
-    }
-
-    /**
-     * Runs a task at a specific location (region-aware for Folia).
-     * 
-     * @param plugin The plugin instance
-     * @param location The location context
-     * @param task The task to run
+     * Runs a task on the thread that owns the given location.
      */
     public static void runAtLocation(Plugin plugin, Location location, Runnable task) {
-        if (isFolia()) {
+        if (FOLIA && regionExecuteLocation != null) {
             try {
-                Object regionScheduler = Bukkit.class.getMethod("getRegionScheduler").invoke(null);
-                regionScheduler.getClass().getMethod("run", Plugin.class, Location.class, java.util.function.Consumer.class)
-                    .invoke(regionScheduler, plugin, location, (java.util.function.Consumer<Object>) (t) -> task.run());
+                Object scheduler = getRegionScheduler.invoke(null);
+                regionExecuteLocation.invoke(scheduler, plugin, location, task);
+                return;
             } catch (Exception e) {
-                Bukkit.getScheduler().runTask(plugin, task);
+                warn(plugin, "region task", e);
             }
-        } else {
-            Bukkit.getScheduler().runTask(plugin, task);
         }
+        Bukkit.getScheduler().runTask(plugin, task);
+    }
+
+    // --- Asynchronous ---
+
+    /**
+     * Runs a task off any server thread. Must never touch the world.
+     */
+    public static void runAsync(Plugin plugin, Runnable task) {
+        if (FOLIA && asyncRunNow != null) {
+            try {
+                Object scheduler = getAsyncScheduler.invoke(null);
+                asyncRunNow.invoke(scheduler, plugin, asConsumer(task));
+                return;
+            } catch (Exception e) {
+                warn(plugin, "async task", e);
+            }
+        }
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, task);
     }
 
     /**
-     * Gets the server software name for logging purposes.
-     * 
-     * @return Server software name
+     * Runs a repeating task off any server thread. Must never touch the world.
+     *
+     * @return a cancellable handle on both platforms
+     */
+    public static Task runTimerAsync(Plugin plugin, Runnable task, long delayTicks, long periodTicks) {
+        long delay = Math.max(1L, delayTicks);
+        long period = Math.max(1L, periodTicks);
+
+        if (FOLIA && asyncRunAtFixedRate != null) {
+            try {
+                Object scheduler = getAsyncScheduler.invoke(null);
+                Object handle = asyncRunAtFixedRate.invoke(scheduler, plugin, asConsumer(task),
+                        delay * 50L, period * 50L, TimeUnit.MILLISECONDS);
+                return new FoliaTask(handle);
+            } catch (Exception e) {
+                warn(plugin, "repeating async task", e);
+            }
+        }
+        return new BukkitTaskHandle(
+                Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, task, delay, period));
+    }
+
+    // --- Server identification ---
+
+    /**
+     * The server software name, for the startup log.
      */
     public static String getServerSoftware() {
         String version = Bukkit.getVersion().toLowerCase();
         String name = Bukkit.getName().toLowerCase();
-        
-        // Check for Folia-based servers first (regionized)
-        if (isFolia()) {
-            // Check for specific Folia forks
-            if (name.contains("luminol") || version.contains("luminol")) {
-                return "Luminol";
-            } else if (name.contains("lightingluminol") || version.contains("lightingluminol")) {
+
+        if (FOLIA) {
+            if (contains(name, version, "lightingluminol")) {
                 return "LightingLuminol";
-            } else if (name.contains("leaf") || version.contains("leaf")) {
+            }
+            if (contains(name, version, "luminol")) {
+                return "Luminol";
+            }
+            if (contains(name, version, "leaf")) {
                 return "LeafMC";
-            } else if (name.contains("kaiiju") || version.contains("kaiiju")) {
+            }
+            if (contains(name, version, "kaiiju")) {
                 return "Kaiiju";
             }
             return "Folia";
         }
-        
-        // Check for Paper-based servers
-        if (version.contains("purpur") || name.contains("purpur")) {
+
+        if (contains(name, version, "purpur")) {
             return "Purpur";
-        } else if (version.contains("pufferfish") || name.contains("pufferfish")) {
+        }
+        if (contains(name, version, "pufferfish")) {
             return "Pufferfish";
-        } else if (version.contains("paper") || name.contains("paper")) {
+        }
+        if (contains(name, version, "paper")) {
             return "Paper";
-        } else if (version.contains("spigot") || name.contains("spigot")) {
+        }
+        if (contains(name, version, "spigot")) {
             return "Spigot";
-        } else if (name.contains("craftbukkit")) {
+        }
+        if (name.contains("craftbukkit")) {
             return "CraftBukkit";
         }
-        
-        return "Bukkit-Compatible";
+        return "Bukkit-compatible";
     }
-    
+
+    private static boolean contains(String name, String version, String needle) {
+        return name.contains(needle) || version.contains(needle);
+    }
+
+    // --- Internals ---
+
+    private static Consumer<Object> asConsumer(Runnable task) {
+        return ignored -> task.run();
+    }
+
+    private static void warn(Plugin plugin, String what, Exception e) {
+        plugin.getLogger().warning("Could not schedule a " + what + " through Folia (" + e.getMessage()
+                + "). Falling back to the standard scheduler.");
+    }
+
     /**
-     * Checks if the server is running a Folia-based fork.
-     * This includes Folia, Luminol, LightingLuminol, LeafMC, Kaiiju, etc.
-     * 
-     * @return true if running on any Folia-based server
+     * A cancellable scheduled task, independent of the platform.
      */
-    public static boolean isFoliaBasedServer() {
-        return isFolia();
+    public interface Task {
+        void cancel();
+    }
+
+    private static final class BukkitTaskHandle implements Task {
+        private final BukkitTask task;
+
+        BukkitTaskHandle(BukkitTask task) {
+            this.task = task;
+        }
+
+        @Override
+        public void cancel() {
+            if (task != null && !task.isCancelled()) {
+                task.cancel();
+            }
+        }
+    }
+
+    private static final class FoliaTask implements Task {
+        private final Object handle;
+
+        FoliaTask(Object handle) {
+            this.handle = handle;
+        }
+
+        @Override
+        public void cancel() {
+            if (handle == null || scheduledTaskCancel == null) {
+                return;
+            }
+            try {
+                scheduledTaskCancel.invoke(handle);
+            } catch (Exception e) {
+                Bukkit.getLogger().warning("[PrivateChest] Could not cancel a Folia task: " + e.getMessage());
+            }
+        }
     }
 }

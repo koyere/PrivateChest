@@ -1,14 +1,17 @@
 package me.tuplugin.privatechest;
 
+import java.util.Arrays;
+import java.util.List;
+
 import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
-import org.bukkit.util.RayTraceResult;
 
-import me.tuplugin.privatechest.enums.ContainerType;
+import me.tuplugin.privatechest.util.TabUtils;
 
 /**
  * Command executor for the /renamecontainer command.
@@ -18,7 +21,10 @@ import me.tuplugin.privatechest.enums.ContainerType;
  * @since 2.1
  * @author PrivateChest Team
  */
-public class RenameCommand implements CommandExecutor {
+public class RenameCommand implements CommandExecutor, TabCompleter {
+
+    /** Words that clear the name instead of setting one. */
+    private static final List<String> CLEAR_KEYWORDS = Arrays.asList("remove", "clear", "delete");
 
     private final PrivateChest plugin;
     private final ContainerNameManager nameManager;
@@ -41,7 +47,7 @@ public class RenameCommand implements CommandExecutor {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         // Only players can use this command
         if (!(sender instanceof Player)) {
-            sender.sendMessage(messageManager.raw("console_only_player"));
+            messageManager.send(sender, messageManager.raw("console_only_player"));
             return true;
         }
 
@@ -49,40 +55,29 @@ public class RenameCommand implements CommandExecutor {
 
         // Check permission
         if (!player.hasPermission("privatechest.rename")) {
-            player.sendMessage(messageManager.raw("no_permission"));
+            messageManager.send(player, messageManager.raw("no_permission"));
             return true;
         }
 
         // Check for correct usage
         if (args.length == 0) {
-            player.sendMessage(messageManager.get("usage_rename_container"));
+            messageManager.send(player, messageManager.get("usage_rename_container"));
             return true;
         }
 
-        // Get the block the player is looking at
-        Block targetBlock = getTargetBlock(player);
-        if (targetBlock == null || !ContainerType.isLockableContainer(targetBlock.getType())) {
-            player.sendMessage(messageManager.raw("not_a_chest"));
+        Block targetBlock = ContainerUtils.getTargetContainer(player);
+        if (targetBlock == null) {
+            messageManager.send(player, messageManager.raw("not_a_chest"));
             return true;
         }
 
         Location targetLocation = targetBlock.getLocation();
 
-        // Handle different subcommands
-        String subCommand = args[0].toLowerCase();
-        
-        switch (subCommand) {
-            case "remove":
-            case "clear":
-            case "delete":
-                handleRemoveName(player, targetLocation);
-                break;
-            
-            default:
-                // Treat the first argument as the new name
-                String newName = String.join(" ", args);
-                handleSetName(player, targetLocation, newName);
-                break;
+        // A single clearing keyword removes the name; anything else is treated as the new name.
+        if (args.length == 1 && CLEAR_KEYWORDS.contains(args[0].toLowerCase())) {
+            handleRemoveName(player, targetLocation);
+        } else {
+            handleSetName(player, targetLocation, String.join(" ", args));
         }
 
         return true;
@@ -99,7 +94,7 @@ public class RenameCommand implements CommandExecutor {
         ContainerNameManager.NameResult result = nameManager.setContainerName(location, player, name);
         
         if (result.isSuccess()) {
-            player.sendMessage(messageManager.get(result.getMessageKey())
+            messageManager.send(player, messageManager.get(result.getMessageKey())
                     .replace("{name}", name)
                     .replace("{container}", getContainerTypeName(location)));
         } else {
@@ -111,7 +106,7 @@ public class RenameCommand implements CommandExecutor {
                                 .replace("{limit}", result.getDetails());
             }
             
-            player.sendMessage(message);
+            messageManager.send(player, message);
         }
     }
 
@@ -125,29 +120,11 @@ public class RenameCommand implements CommandExecutor {
         ContainerNameManager.NameResult result = nameManager.removeContainerName(location, player);
         
         if (result.isSuccess()) {
-            player.sendMessage(messageManager.get(result.getMessageKey())
+            messageManager.send(player, messageManager.get(result.getMessageKey())
                     .replace("{container}", getContainerTypeName(location)));
         } else {
-            player.sendMessage(messageManager.get(result.getMessageKey()));
+            messageManager.send(player, messageManager.get(result.getMessageKey()));
         }
-    }
-
-    /**
-     * Gets the block the player is looking at within a reasonable range.
-     * Uses ray tracing for accurate block detection.
-     * 
-     * @param player The player
-     * @return The target block, or null if no valid target
-     */
-    private Block getTargetBlock(Player player) {
-        // Use ray tracing to get the block the player is looking at
-        RayTraceResult result = player.rayTraceBlocks(5.0); // 5 block range
-        
-        if (result != null && result.getHitBlock() != null) {
-            return result.getHitBlock();
-        }
-        
-        return null;
     }
 
     /**
@@ -157,17 +134,25 @@ public class RenameCommand implements CommandExecutor {
      * @return A display name for the container type
      */
     private String getContainerTypeName(Location location) {
-        if (location.getWorld() == null) {
-            return "Container";
+        String displayName = nameManager.getDisplayName(location);
+        if (displayName != null) {
+            return displayName;
         }
-        
-        Block block = location.getBlock();
-        ContainerType type = ContainerType.fromMaterial(block.getType());
-        
-        if (type != null) {
-            return type.getDisplayName();
+        return messageManager.raw("container_generic_name");
+    }
+
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (!(sender instanceof Player) || !sender.hasPermission("privatechest.rename")) {
+            return TabUtils.none();
         }
-        
-        return "Container";
+
+        if (args.length == 1) {
+            // Only the clearing keywords are suggested. A name is free text, so suggesting anything
+            // else would just get in the way.
+            return TabUtils.filter(CLEAR_KEYWORDS, args[0]);
+        }
+
+        return TabUtils.none();
     }
 }

@@ -1,6 +1,6 @@
 # Main plugin definition
 name: PrivateChest
-version: 2.3.1
+version: 3.0
 main: me.tuplugin.privatechest.PrivateChest
 # Minimum Spigot/Paper API version required (1.16 ensures modern methods)
 api-version: '1.16'
@@ -24,8 +24,8 @@ commands:
     usage: /unlockchest <password>
 
   privatechest:
-    description: Reload PrivateChest configuration and messages.
-    usage: /privatechest reload
+    description: Administration - reload, status, save and storage migration.
+    usage: /privatechest <reload|status|save|migrate>
     # Optional: Added a short alias for convenience
     aliases: [pc]
 
@@ -142,10 +142,19 @@ permissions:
     description: Allows locking up to 1 chest.
     default: false
 
-  # Granular container type limits (examples - more can be added as needed)
-  # Format: privatechest.limit.{container_type}.{number}
-  
-  # Chest limits
+  # --- Per-family limits (v3.0+) ---
+  #
+  # Format: privatechest.limit.<family>.<number>  or  privatechest.limit.<family>.unlimited
+  # Enabled by setting container-limits.enabled to true in config.yml.
+  #
+  # Families group containers that are the same thing to a player. All seventeen shulker box colours
+  # are 'shulker_box', and every oxidation and waxed stage of a copper chest is 'copper_chest'.
+  # 3.0 replaced the per-colour nodes from 2.x, which could never cover copper chests because their
+  # material changes as they oxidize.
+  #
+  # Valid families: chest, trapped_chest, copper_chest, barrel, shulker_box, crafter, other
+  # Any number may be used in place of the examples registered below.
+
   privatechest.limit.chest.unlimited:
     description: Allows unlimited chest locks.
     default: false
@@ -159,7 +168,26 @@ permissions:
     description: Allows locking up to 10 chests.
     default: false
 
-  # Barrel limits
+  privatechest.limit.trapped_chest.unlimited:
+    description: Allows unlimited trapped chest locks.
+    default: false
+  privatechest.limit.trapped_chest.10:
+    description: Allows locking up to 10 trapped chests.
+    default: false
+  privatechest.limit.trapped_chest.5:
+    description: Allows locking up to 5 trapped chests.
+    default: false
+
+  privatechest.limit.copper_chest.unlimited:
+    description: Allows unlimited copper chest locks, at any oxidation stage.
+    default: false
+  privatechest.limit.copper_chest.25:
+    description: Allows locking up to 25 copper chests.
+    default: false
+  privatechest.limit.copper_chest.10:
+    description: Allows locking up to 10 copper chests.
+    default: false
+
   privatechest.limit.barrel.unlimited:
     description: Allows unlimited barrel locks.
     default: false
@@ -173,9 +201,8 @@ permissions:
     description: Allows locking up to 5 barrels.
     default: false
 
-  # Shulker box limits
   privatechest.limit.shulker_box.unlimited:
-    description: Allows unlimited shulker box locks.
+    description: Allows unlimited shulker box locks, in any colour.
     default: false
   privatechest.limit.shulker_box.10:
     description: Allows locking up to 10 shulker boxes.
@@ -188,4 +215,14 @@ permissions:
     default: false
   privatechest.limit.shulker_box.1:
     description: Allows locking up to 1 shulker box.
+    default: false
+
+  privatechest.limit.crafter.unlimited:
+    description: Allows unlimited crafter locks.
+    default: false
+  privatechest.limit.crafter.10:
+    description: Allows locking up to 10 crafters.
+    default: false
+  privatechest.limit.crafter.5:
+    description: Allows locking up to 5 crafters.
     default: false

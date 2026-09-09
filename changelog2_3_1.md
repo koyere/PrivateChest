@@ -1,10 +1,10 @@
 # 📜 PrivateChest - Version 2.3.1 Release Notes
 
-**Release Date:** February 27th, 2026
+**Release Date:** 20/03/2026
 
 ---
 
-## [2.3.1] - 2026-02-27
+## [2.3.1] - 2026-03-20
 
 ### Added
 - **Granular Command Permissions**
@@ -67,7 +67,7 @@
 - Thread safety improvements are transparent — no action needed
 
 ### Compatibility
-- Minecraft 1.16.x – 1.21.5
+- Minecraft 1.16.x – 1.21.11
 - Tested on Paper, Purpur, Pufferfish, and Spigot
 
 ---

@@ -1,14 +1,24 @@
 package me.tuplugin.privatechest;
 
+import java.util.List;
 import java.util.Set;
 
+import me.tuplugin.privatechest.util.AttemptTracker;
+import me.tuplugin.privatechest.util.TabUtils;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
-public class UnlockCommand implements CommandExecutor {
+/**
+ * Removes a player's own protection from a container after they confirm the password.
+ *
+ * <p>Wrong attempts are rate limited as of 3.0, and failures can be logged for staff. Guessing was
+ * previously unlimited, free, and invisible.</p>
+ */
+public class UnlockCommand implements CommandExecutor, TabCompleter {
 
     private final PrivateChest plugin;
     private final ChestLocker chestLocker;
@@ -16,78 +26,100 @@ public class UnlockCommand implements CommandExecutor {
 
     public UnlockCommand(PrivateChest plugin) {
         this.plugin = plugin;
-        this.chestLocker = ChestLocker.getInstance();
+        this.chestLocker = plugin.getChestLocker();
         this.messages = plugin.getMessageManager();
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player)) {
-            sender.sendMessage("This command can only be used by players.");
+            messages.send(sender, messages.raw("console_only_player"));
             return true;
         }
 
         Player player = (Player) sender;
 
         if (!player.hasPermission("privatechest.unlock")) {
-            player.sendMessage(messages.raw("no_permission"));
+            messages.send(player, messages.raw("no_permission"));
             return true;
         }
 
         if (args.length != 1) {
-            player.sendMessage(messages.raw("usage_unlock"));
+            messages.send(player, messages.raw("usage_unlock"));
+            return true;
+        }
+
+        AttemptTracker attempts = plugin.getPasswordAttempts();
+        long lockout = attempts.getRemainingLockoutSeconds(player.getUniqueId());
+        if (lockout > 0L) {
+            messages.send(player, messages.get("too_many_attempts")
+                    .replace("{seconds}", String.valueOf(lockout)));
             return true;
         }
 
         String password = args[0];
-        Block targetBlock = player.getTargetBlock(null, 5);
+        Block targetBlock = ContainerUtils.getTargetContainer(player);
 
-        if (targetBlock == null || !ContainerUtils.isLockableContainer(targetBlock.getType())) {
-            player.sendMessage(messages.get("not_a_chest"));
+        if (targetBlock == null) {
+            messages.send(player, messages.get("not_a_chest"));
             return true;
         }
 
-        // Get all blocks of the container (handles double chests)
+        // Find whichever part of the container carries the record.
         Set<Block> containerBlocks = ContainerUtils.getContainerBlocks(targetBlock);
         Block lockedBlock = null;
-
-        // Find if any part is locked
         for (Block part : containerBlocks) {
             if (chestLocker.isChestLocked(part)) {
                 lockedBlock = part;
                 break;
             }
         }
-        // --- FIN: Lógica de Cofre Doble ---
 
-        // If no part is locked, send message
         if (lockedBlock == null) {
-            player.sendMessage(messages.raw("not_locked"));
+            messages.send(player, messages.raw("not_locked"));
             return true;
         }
 
-        // Check ownership using the found locked block
         if (!chestLocker.isOwner(lockedBlock, player)) {
-            player.sendMessage(messages.get("not_your_chest"));
+            messages.send(player, messages.get("not_your_chest"));
             return true;
         }
 
-        // Try to unlock using the found locked block's password
-        boolean success = chestLocker.unlockChest(lockedBlock, player, password);
-
-        if (success) {
-            // On success, remove protection from ALL parts
-            for (Block part : containerBlocks) {
-                if (chestLocker.isChestLocked(part)) { // Check again in case of weird states
-                    chestLocker.removeProtection(part);
-                }
-            }
-            plugin.getDataManager().saveData();
-            player.sendMessage(messages.get("unlocked"));
-        } else {
-            player.sendMessage(messages.get("wrong_password"));
+        if (!chestLocker.unlockChest(lockedBlock, player, password)) {
+            handleWrongPassword(player, lockedBlock, attempts);
+            return true;
         }
 
+        attempts.clear(player.getUniqueId());
+        for (Block part : containerBlocks) {
+            chestLocker.removeProtection(part);
+        }
+        messages.send(player, messages.get("unlocked"));
         return true;
+    }
+
+    private void handleWrongPassword(Player player, Block lockedBlock, AttemptTracker attempts) {
+        boolean lockedOut = attempts.recordFailure(player.getUniqueId());
+
+        if (plugin.getConfig().getBoolean("security.log-failed-attempts", true)) {
+            plugin.getLogger().warning("[Security] " + player.getName() + " entered a wrong password for the "
+                    + "container at " + lockedBlock.getWorld().getName() + "," + lockedBlock.getX() + ","
+                    + lockedBlock.getY() + "," + lockedBlock.getZ()
+                    + (lockedOut ? " (now rate limited)." : "."));
+        }
+
+        if (lockedOut) {
+            long remaining = attempts.getRemainingLockoutSeconds(player.getUniqueId());
+            messages.send(player, messages.get("too_many_attempts")
+                    .replace("{seconds}", String.valueOf(remaining)));
+        } else {
+            messages.send(player, messages.get("wrong_password"));
+        }
+    }
+
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        // The only argument is a password; never suggest anything for it.
+        return TabUtils.none();
     }
 }

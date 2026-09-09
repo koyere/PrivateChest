@@ -1,14 +1,19 @@
 package me.tuplugin.privatechest;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
+import me.tuplugin.privatechest.container.ContainerFamily;
+import me.tuplugin.privatechest.util.TabUtils;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
-public class LockCommand implements CommandExecutor {
+public class LockCommand implements CommandExecutor, TabCompleter {
 
     private final PrivateChest plugin;
     private final ChestLocker chestLocker;
@@ -25,93 +30,100 @@ public class LockCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player)) {
-            sender.sendMessage("This command can only be used by players.");
+            messages.send(sender, messages.raw("console_only_player"));
             return true;
         }
 
         Player player = (Player) sender;
 
         if (!player.hasPermission("privatechest.lock")) {
-            player.sendMessage(messages.raw("no_permission"));
+            messages.send(player, messages.raw("no_permission"));
             return true;
         }
 
         if (args.length != 1) {
-            player.sendMessage(messages.raw("usage_lock"));
+            messages.send(player, messages.raw("usage_lock"));
             return true;
         }
 
         String password = args[0];
-        Block targetBlock = player.getTargetBlock(null, 5);
+        Block targetBlock = ContainerUtils.getTargetContainer(player);
 
-        if (targetBlock == null || !ContainerUtils.isLockableContainer(targetBlock.getType())) {
-            player.sendMessage(messages.get("not_a_chest"));
+        if (targetBlock == null) {
+            messages.send(player, messages.get("not_a_chest"));
             return true;
         }
 
         Set<Block> blocksToLock = ContainerUtils.getContainerBlocks(targetBlock);
 
         if (blocksToLock.isEmpty()) {
-            player.sendMessage(messages.get("not_a_chest"));
+            messages.send(player, messages.get("not_a_chest"));
             return true;
         }
 
         // Check if any part is already locked
         for (Block block : blocksToLock) {
             if (chestLocker.isChestLocked(block)) {
-                player.sendMessage(messages.get("already_locked"));
+                messages.send(player, messages.get("already_locked"));
                 return true;
             }
         }
 
-        // Check chest limits (only if not admin)
-        if (!player.hasPermission("privatechest.admin") && limitManager.areLimitsEnabled()) {
-            if (!limitManager.canPlayerLockAdditional(player, blocksToLock.size())) {
-                int limit = limitManager.getPlayerLimit(player);
-                int current = limitManager.getPlayerChestCount(player);
+        ContainerFamily family = plugin.getContainerRegistry().getFamily(targetBlock.getType());
 
-                if (limit == -1) {
-                    // This shouldn't happen but just in case
-                    player.sendMessage(messages.get("limit_error"));
-                } else {
-                    player.sendMessage(messages.get("limit_exceeded")
-                            .replace("{current}", String.valueOf(current))
-                            .replace("{limit}", String.valueOf(limit))
-                            .replace("{trying}", String.valueOf(blocksToLock.size())));
-                }
-                return true;
-            }
+        // One check for both limit systems, shared with sign-based locking.
+        LimitManager.LimitCheck limitCheck =
+                limitManager.checkCanLock(player, targetBlock.getType(), blocksToLock.size());
+        if (!limitCheck.isAllowed()) {
+            messages.send(player, limitManager.getDeniedMessage(limitCheck));
+            return true;
         }
 
-        // Lock all parts
+        // Lock every part of the container, rolling back if any part fails so a double chest can
+        // never end up with one protected half and one open half.
         boolean allLockedSuccessfully = true;
+        List<Block> lockedParts = new ArrayList<>(blocksToLock.size());
         for (Block block : blocksToLock) {
-            if (!chestLocker.lockChest(block, player, password)) {
+            if (chestLocker.lockChest(block, player, password)) {
+                lockedParts.add(block);
+            } else {
                 allLockedSuccessfully = false;
                 break;
             }
         }
 
+        if (!allLockedSuccessfully) {
+            for (Block locked : lockedParts) {
+                chestLocker.removeProtection(locked);
+            }
+        }
+
         // Send feedback
         if (allLockedSuccessfully) {
-            plugin.getDataManager().saveData();
-            player.sendMessage(messages.get("locked"));
+            messages.send(player, messages.get("locked")
+                    .replace("{container}", limitManager.familyName(family)));
 
-            // Send limit warning if applicable
-            String warningMessage = limitManager.getLimitWarningMessage(player);
+            String warningMessage = limitManager.getLimitWarningMessage(player, family);
             if (warningMessage != null) {
-                player.sendMessage(warningMessage);
+                messages.send(player, warningMessage);
             }
 
-            // Show current limit status if limits are enabled
             if (limitManager.areLimitsEnabled() && !player.hasPermission("privatechest.admin")) {
-                String status = limitManager.getLimitStatus(player);
-                player.sendMessage(messages.get("limit_status").replace("{status}", status));
+                messages.send(player, messages.get("limit_status")
+                        .replace("{status}", limitManager.getLimitStatus(player, family))
+                        .replace("{container}", limitManager.familyName(family)));
             }
         } else {
-            player.sendMessage(messages.get("error_generic"));
+            messages.send(player, messages.get("error_generic"));
         }
 
         return true;
+    }
+
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        // The only argument is a password. Nothing is ever suggested for it, and returning an empty
+        // list stops the server from offering online player names as password candidates.
+        return TabUtils.none();
     }
 }
