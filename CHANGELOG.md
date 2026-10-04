@@ -6,6 +6,26 @@ Releases from 2.1 onwards have their own detailed file; this page is the summary
 
 ---
 
+## [3.1]
+
+**Full notes: [changelog3_1.md](changelog3_1.md)**
+
+### Added
+- `/chestlist [page]` lists your protected containers with their world and coordinates
+  (aliases `/mychests`, `/listchests`). Double chests are listed once, custom names are shown
+- `/chestlist <player> [page]` for staff, including offline players, with `privatechest.list.others`
+- `worlds.mode` (`WHITELIST`, `BLACKLIST` or `DISABLED`) and `worlds.list` in `config.yml` choose which
+  worlds containers can be locked in, by command or sign
+- `privatechest.bypass.worlds` lets staff lock anywhere
+- `/privatechest status` shows the active world restriction
+- API: `PrivateChestAPI.isLockingAllowedIn(World)`
+
+### Notes
+- World restrictions only affect new locks. Existing protections are enforced in every world
+- Nothing changes on update until you configure it
+
+---
+
 ## [3.0]
 
 **Full notes: [changelog3_0.md](changelog3_0.md)** — read the "Before you update" section first.

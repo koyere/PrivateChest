@@ -11,6 +11,8 @@ command and the container is yours.
 - Lock by command or by writing a tag on a sign next to the container
 - Trust other players so they can use your containers without knowing your password
 - Give containers custom names
+- List every container you own, with its world and coordinates
+- Choose which worlds containers can be locked in
 - Protection against breaking, explosions, fire, pistons, mobs and hoppers
 - Per-player container limits by permission, overall or per container type
 - YAML or SQLite storage, switchable at runtime
@@ -75,20 +77,23 @@ Sign-based locking is the easiest route for Bedrock players, because it needs no
 | `/untrust all` | Revoke everyone's access | `privatechest.untrust` |
 | `/renamecontainer <name>` | Name a container you own | `privatechest.rename` |
 | `/renamecontainer remove` | Clear the name (`clear` and `delete` also work) | `privatechest.rename` |
+| `/chestlist [page]` | List your protected containers with their world and coordinates | `privatechest.list` |
 
 ### Admins
 
 | Command | Description |
 |:---|:---|
+| `/chestlist <player> [page]` | List another player's protected containers, online or offline. Needs `privatechest.list.others` |
 | `/privatechest reload` | Reload `config.yml` and the message files |
 | `/privatechest status` | Storage backend, protected container count, trust count, protectable types, unsaved changes |
 | `/privatechest save` | Write all pending changes to disk now |
 | `/privatechest migrate <yaml\|sqlite>` | Move all data to the other backend and switch to it |
 | `/clearchests` | Remove records whose container no longer exists |
 
-All admin commands require `privatechest.admin`.
+All other admin commands require `privatechest.admin`.
 
-Aliases: `/pc` for `/privatechest`, and `/renamechest` for `/renamecontainer`.
+Aliases: `/pc` for `/privatechest`, `/renamechest` for `/renamecontainer`, and `/mychests` or
+`/listchests` for `/chestlist`.
 
 Every command has tab completion, and it respects permissions: a player who cannot run a command is
 offered nothing for it. Passwords are never suggested.
@@ -130,7 +135,10 @@ allow signs, or the other way round.
 | `privatechest.untrust` | `/untrust` | `true` |
 | `privatechest.rename` | `/renamecontainer` | `true` |
 | `privatechest.sign` | Locking with a sign | `true` |
-| `privatechest.admin` | Admin commands and bypassing protection | `op` |
+| `privatechest.list` | `/chestlist` for your own containers | `true` |
+| `privatechest.admin` | Admin commands and bypassing protection. Includes the two below | `op` |
+| `privatechest.list.others` | `/chestlist <player>` | `op` |
+| `privatechest.bypass.worlds` | Locking in worlds excluded by `worlds` in `config.yml` | `op` |
 
 > To block one command, negate its permission in your permissions plugin. The rest keep working.
 
@@ -166,6 +174,7 @@ their copper chests weather.
 | `language`, `use-player-locale` | Which translation, and whether each player gets their own |
 | `container-names` | Length, allowed characters and forbidden words for `/renamecontainer` |
 | `containers` | Which blocks can be protected, including auto-discovery of new ones |
+| `worlds` | Which worlds containers can be locked in |
 | `container-limits` | Per-container-type limits |
 | `security` | Password hashing strength and wrong-attempt rate limiting |
 | `auto-cleanup` | When and how hard the orphaned-record cleanup runs |
@@ -199,6 +208,21 @@ containers:
 
 With `auto-discover` on, a container added by a future Minecraft update is protectable the day it
 ships. `disabled` stops new locks on a type without touching protections players already have.
+
+### World restrictions
+
+```yaml
+worlds:
+  mode: DISABLED     # WHITELIST, BLACKLIST or DISABLED
+  list: []           # e.g. "world", "world_nether"
+```
+
+`WHITELIST` allows locking only in the listed worlds, and `BLACKLIST` everywhere except them. This
+covers `/lockchest` and private signs.
+
+Only new locks are affected. Containers that are already protected stay protected in every world, so
+adding a world to a blacklist never opens anyone's containers. Staff with `privatechest.bypass.worlds`
+can lock anywhere.
 
 ### Security
 
@@ -289,10 +313,16 @@ boolean lockable = PrivateChestAPI.isLockableContainer(Material.BARREL);
 
 // How many containers are protected in total?
 int count = PrivateChestAPI.getLockedChestCount();
+
+// Does the server's worlds configuration allow new locks here? (3.1+)
+boolean allowed = PrivateChestAPI.isLockingAllowedIn(world);
 ```
 
 `isLockableContainer` answers from the server's live container list, so it reflects your
 `containers` configuration.
+
+`lockBlock` is not restricted by world. Call `isLockingAllowedIn` first if your plugin should honour
+the server owner's `worlds` setting.
 
 ---
 
