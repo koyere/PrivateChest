@@ -1,6 +1,6 @@
 # Main plugin definition
 name: PrivateChest
-version: 3.0
+version: 3.1
 main: me.tuplugin.privatechest.PrivateChest
 # Minimum Spigot/Paper API version required (1.16 ensures modern methods)
 api-version: '1.16'
@@ -46,6 +46,11 @@ commands:
     usage: /renamecontainer <name> or /renamecontainer remove
     aliases: [renamechest]
 
+  chestlist:
+    description: List your protected containers with their world and coordinates.
+    usage: /chestlist [page] or /chestlist <player> [page]
+    aliases: [mychests, listchests]
+
 # Permission definitions
 permissions:
   privatechest.use:
@@ -58,6 +63,7 @@ permissions:
       privatechest.untrust: true
       privatechest.rename: true
       privatechest.sign: true
+      privatechest.list: true
 
   # --- Granular Command Permissions (v2.3.1+) ---
   # These allow fine-grained control over individual commands.
@@ -88,9 +94,27 @@ permissions:
     description: Allows locking containers via [Private] signs.
     default: true
 
+  privatechest.list:
+    description: Allows using /chestlist to list your own protected containers.
+    default: true
+
   privatechest.admin:
     description: Allows use of admin commands and bypass protection.
     # Defaults to op, so only server operators have admin rights by default.
+    default: op
+    # Granted as children so that each can still be negated individually for a staff member.
+    children:
+      privatechest.list.others: true
+      privatechest.bypass.worlds: true
+
+  # --- v3.1+ ---
+
+  privatechest.list.others:
+    description: Allows using /chestlist <player> to list another player's protected containers.
+    default: op
+
+  privatechest.bypass.worlds:
+    description: Allows locking containers in worlds excluded by the 'worlds' section of config.yml.
     default: op
 
   # Chest limit permissions

@@ -63,6 +63,13 @@ public class SignProtectionListener implements Listener {
         }
 
         Block signBlock = event.getBlock();
+
+        if (!plugin.getWorldPolicy().allowsLocking(player, signBlock.getWorld())) {
+            messages.send(player, "world_locking_disabled");
+            event.setCancelled(true);
+            return;
+        }
+
         Set<Block> chestBlocks = findNearbyChests(signBlock);
 
         if (chestBlocks.isEmpty()) {

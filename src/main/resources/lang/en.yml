@@ -42,6 +42,8 @@ usage_lock: "&cUsage: /lockchest <password>"
 # {container} is the container type name.
 locked: "&aThis {container} has been locked."
 already_locked: "&eThis container is already locked."
+# Sent by /lockchest and by private signs in a world excluded by 'worlds' in config.yml.
+world_locking_disabled: "&cContainers cannot be locked in this world."
 
 # --- /unlockchest ---
 
@@ -75,6 +77,26 @@ trusted_player_entry: "&7- &e{player} &7({status})"
 trusted_players_footer: "&6=== &eTotal: {count} &6==="
 player_status_online: "&aonline"
 player_status_offline: "&7offline"
+
+# --- /chestlist ---
+
+usage_chestlist: "&eUsage: /chestlist [page]"
+# Shown instead of the above to staff with privatechest.list.others.
+usage_chestlist_others: "&eUsage: /chestlist [page] or /chestlist <player> [page]"
+# {count} is the number of containers.
+chest_list_header: "&6=== &eYour protected containers &7({count}) &6==="
+chest_list_header_other: "&6=== &e{player}'s protected containers &7({count}) &6==="
+# {container} is the custom name if it has one, otherwise the type name.
+# {double} is replaced by chest_list_double for a double chest, and is empty otherwise.
+chest_list_entry: "&7- &e{container}{double} &7| &f{world} &7| X: &f{x}&7, Y: &f{y}&7, Z: &f{z}"
+chest_list_double: " &8(double)"
+chest_list_footer: "&6=== &ePage {page} of {pages} &6==="
+# {command} is the full command for the next page.
+chest_list_next_page: "&7Next page: &e{command}"
+chest_list_empty: "&eYou have no protected containers."
+chest_list_empty_other: "&e{player} has no protected containers."
+chest_list_invalid_page: "&cThere is no page {page}. There are {pages} page(s)."
+chest_list_player_unknown: "&cNo player named '{player}' owns any protected containers."
 
 # --- Container limits ---
 #
@@ -138,6 +160,10 @@ status_storage: "&7Storage backend: &f{type}"
 status_containers: "&7Protected containers: &f{amount}"
 status_trust: "&7Trust relations: &f{amount}"
 status_container_types: "&7Protectable container types: &f{amount}"
+status_worlds: "&7World restriction for new locks: &f{state}"
+status_worlds_off: "&aoff"
+status_worlds_whitelist: "&eonly in {amount} listed world(s)"
+status_worlds_blacklist: "&eexcept in {amount} listed world(s)"
 status_pending: "&7Unsaved changes: &f{state}"
 status_pending_yes: "&eyes"
 status_pending_no: "&anone"

@@ -36,6 +36,8 @@ usage_lock: "&cUso: /lockchest <contraseña>"
 # {container} es el nombre del tipo de contenedor.
 locked: "&aEste {container} queda protegido."
 already_locked: "&eEste contenedor ya está protegido."
+# Lo envían /lockchest y los carteles privados en un mundo excluido por 'worlds' en config.yml.
+world_locking_disabled: "&cNo se pueden proteger contenedores en este mundo."
 
 # --- /unlockchest ---
 
@@ -68,6 +70,26 @@ trusted_player_entry: "&7- &e{player} &7({status})"
 trusted_players_footer: "&6=== &eTotal: {count} &6==="
 player_status_online: "&aconectado"
 player_status_offline: "&7desconectado"
+
+# --- /chestlist ---
+
+usage_chestlist: "&eUso: /chestlist [página]"
+# Se muestra en lugar del anterior al staff con privatechest.list.others.
+usage_chestlist_others: "&eUso: /chestlist [página] o /chestlist <jugador> [página]"
+# {count} es el número de contenedores.
+chest_list_header: "&6=== &eTus contenedores protegidos &7({count}) &6==="
+chest_list_header_other: "&6=== &eContenedores protegidos de {player} &7({count}) &6==="
+# {container} es el nombre personalizado si lo tiene, y si no el nombre del tipo.
+# {double} se sustituye por chest_list_double en un cofre doble, y queda vacío en los demás.
+chest_list_entry: "&7- &e{container}{double} &7| &f{world} &7| X: &f{x}&7, Y: &f{y}&7, Z: &f{z}"
+chest_list_double: " &8(doble)"
+chest_list_footer: "&6=== &ePágina {page} de {pages} &6==="
+# {command} es el comando completo para la página siguiente.
+chest_list_next_page: "&7Página siguiente: &e{command}"
+chest_list_empty: "&eNo tienes contenedores protegidos."
+chest_list_empty_other: "&e{player} no tiene contenedores protegidos."
+chest_list_invalid_page: "&cNo existe la página {page}. Hay {pages} página(s)."
+chest_list_player_unknown: "&cNingún jugador llamado '{player}' tiene contenedores protegidos."
 
 # --- Límites de contenedores ---
 #
@@ -129,6 +151,10 @@ status_storage: "&7Almacenamiento: &f{type}"
 status_containers: "&7Contenedores protegidos: &f{amount}"
 status_trust: "&7Relaciones de acceso: &f{amount}"
 status_container_types: "&7Tipos de contenedor protegibles: &f{amount}"
+status_worlds: "&7Restricción de mundos para protecciones nuevas: &f{state}"
+status_worlds_off: "&adesactivada"
+status_worlds_whitelist: "&esolo en {amount} mundo(s) de la lista"
+status_worlds_blacklist: "&eexcepto en {amount} mundo(s) de la lista"
 status_pending: "&7Cambios sin guardar: &f{state}"
 status_pending_yes: "&esí"
 status_pending_no: "&aninguno"

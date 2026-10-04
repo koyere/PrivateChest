@@ -77,9 +77,23 @@ public class PrivateChestCommand implements CommandExecutor, TabCompleter {
         messages.sendRaw(sender, "status_containers", "amount", plugin.getProtectionStore().size());
         messages.sendRaw(sender, "status_trust", "amount", plugin.getTrustManager().getTotalTrustCount());
         messages.sendRaw(sender, "status_container_types", "amount", plugin.getContainerRegistry().size());
+        messages.sendRaw(sender, "status_worlds", "state", describeWorldPolicy(sender));
         messages.sendRaw(sender, "status_pending", "state",
                 messages.rawFor(sender, dataManager.hasPendingChanges()
                         ? "status_pending_yes" : "status_pending_no"));
+    }
+
+    private String describeWorldPolicy(CommandSender sender) {
+        WorldPolicy policy = plugin.getWorldPolicy();
+        switch (policy.getMode()) {
+            case WHITELIST:
+                return messages.rawFor(sender, "status_worlds_whitelist", "amount", policy.getWorldCount());
+            case BLACKLIST:
+                return messages.rawFor(sender, "status_worlds_blacklist", "amount", policy.getWorldCount());
+            case DISABLED:
+            default:
+                return messages.rawFor(sender, "status_worlds_off");
+        }
     }
 
     private void handleSave(CommandSender sender) {

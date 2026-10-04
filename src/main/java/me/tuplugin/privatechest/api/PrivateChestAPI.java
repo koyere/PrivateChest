@@ -4,6 +4,7 @@ import me.tuplugin.privatechest.ChestLocker;
 import me.tuplugin.privatechest.PrivateChest;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 
@@ -82,6 +83,10 @@ public class PrivateChestAPI {
 
     /**
      * Locks a block with a password for a specific player.
+     *
+     * <p>Not subject to the {@code worlds} restriction in config.yml, which governs players locking by
+     * command or sign. An integration that should honour it can ask {@link #isLockingAllowedIn(World)}
+     * first.</p>
      *
      * @param block The block to lock
      * @param player The player who will own the lock
@@ -175,6 +180,27 @@ public class PrivateChestAPI {
         return plugin != null
                 && plugin.getContainerRegistry() != null
                 && plugin.getContainerRegistry().isLockable(material);
+    }
+
+    /**
+     * Checks whether the server's {@code worlds} configuration allows new locks in a world.
+     *
+     * <p>Ignores permissions. Existing protections are enforced in every world regardless of this.</p>
+     *
+     * @param world The world to check
+     * @return true if players may lock containers in that world
+     * @throws IllegalArgumentException if world is null
+     * @since 3.1
+     */
+    public static boolean isLockingAllowedIn(World world) {
+        if (world == null) {
+            throw new IllegalArgumentException("World cannot be null");
+        }
+
+        PrivateChest plugin = PrivateChest.getInstance();
+        return plugin == null
+                || plugin.getWorldPolicy() == null
+                || plugin.getWorldPolicy().allowsLocking(world);
     }
 
     /**

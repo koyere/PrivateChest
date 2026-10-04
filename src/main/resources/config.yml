@@ -143,6 +143,34 @@ containers:
   # Default: false
   log-unavailable: false
 
+# --- World Restrictions ---
+
+# Which worlds players may lock containers in, by command or by sign.
+#
+# This only controls NEW locks. Containers that are already protected stay protected in every world,
+# whatever you set here, so adding a world to a blacklist never opens anyone's containers. Protections
+# in a restricted world can still be removed the normal way: /unlockchest, or breaking the container.
+#
+# Players with privatechest.bypass.worlds (included in privatechest.admin) can lock anywhere.
+worlds:
+  # DISABLED   No restriction, containers can be locked in every world.
+  # WHITELIST  Containers can only be locked in the worlds listed below.
+  # BLACKLIST  Containers can be locked everywhere except the worlds listed below.
+  #
+  # A WHITELIST with an empty list stops locking in every world. An unrecognised value is treated as
+  # DISABLED, with a warning in the console.
+  # Default: DISABLED
+  mode: DISABLED
+
+  # World names, as they appear in your server folder. Case is ignored.
+  # Example:
+  #   list:
+  #     - "world"
+  #     - "world_nether"
+  #     - "world_the_end"
+  # Default: []
+  list: []
+
 # --- Feature Settings ---
 
 # Enable sign-based protection: writing the private tag on a sign next to a container locks it.

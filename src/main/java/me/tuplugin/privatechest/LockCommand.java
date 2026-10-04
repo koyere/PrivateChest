@@ -49,6 +49,12 @@ public class LockCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        // The target is always in the player's own world, so this is decided before any block lookup.
+        if (!plugin.getWorldPolicy().allowsLocking(player, player.getWorld())) {
+            messages.send(player, "world_locking_disabled");
+            return true;
+        }
+
         String password = args[0];
         Block targetBlock = ContainerUtils.getTargetContainer(player);
 

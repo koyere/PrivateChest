@@ -1,5 +1,6 @@
 package me.tuplugin.privatechest;
 
+import me.tuplugin.privatechest.commands.ChestListCommand;
 import me.tuplugin.privatechest.commands.TrustCommand;
 import me.tuplugin.privatechest.commands.UntrustCommand;
 import me.tuplugin.privatechest.container.ContainerRegistry;
@@ -28,6 +29,7 @@ public class PrivateChest extends JavaPlugin {
     private AccessGuard accessGuard;
     private AttemptTracker passwordAttempts;
     private ContainerRegistry containerRegistry;
+    private WorldPolicy worldPolicy;
     private SchedulerUtils.Task maintenanceTask;
 
     @Override
@@ -57,6 +59,9 @@ public class PrivateChest extends JavaPlugin {
         // added by newer Minecraft versions work without a plugin update.
         containerRegistry = new ContainerRegistry(this);
         containerRegistry.load();
+
+        worldPolicy = new WorldPolicy(this);
+        worldPolicy.reload();
 
         // Protection state lives in one registry that every other component reads and writes.
         protectionStore = new ProtectionStore();
@@ -123,6 +128,7 @@ public class PrivateChest extends JavaPlugin {
         register("trust", new TrustCommand(this));
         register("untrust", new UntrustCommand(this));
         register("renamecontainer", new RenameCommand(this));
+        register("chestlist", new ChestListCommand(this));
     }
 
     /**
@@ -153,6 +159,7 @@ public class PrivateChest extends JavaPlugin {
         applySecuritySettings();
         containerRegistry.load();
         containerNameManager.reload();
+        worldPolicy.reload();
     }
 
     /**
@@ -244,5 +251,12 @@ public class PrivateChest extends JavaPlugin {
      */
     public ContainerRegistry getContainerRegistry() {
         return containerRegistry;
+    }
+
+    /**
+     * Which worlds new protections may be created in.
+     */
+    public WorldPolicy getWorldPolicy() {
+        return worldPolicy;
     }
 }

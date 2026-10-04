@@ -79,6 +79,16 @@ public final class ProtectionStore {
     }
 
     /**
+     * Snapshot of every player who owns at least one protection.
+     *
+     * <p>Lets a lookup by player name stay proportional to the number of owners rather than to the
+     * number of protections.</p>
+     */
+    public Set<UUID> owners() {
+        return new HashSet<>(byOwner.keySet());
+    }
+
+    /**
      * Snapshot of every key. Safe to iterate while the store is being mutated.
      */
     public Set<ProtectionKey> keys() {
